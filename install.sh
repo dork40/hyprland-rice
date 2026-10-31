@@ -189,13 +189,15 @@ has_pkg() {  # is this package available from the distro's repos?
     esac
 }
 # Immutable Fedora: Bazzite ships its own (Terra) Xwayland, which conflicts with the one Hyprland's package asks for.
-XWL_TRIED=0
+XWL_TRIED=0; XWL_PENDING=0; DEFERRED=()
 fix_xwayland() {
     ((XWL_TRIED)) && return 1; XWL_TRIED=1
     local cur; cur=$(rpm -qa 2>/dev/null | grep -i 'xorg-x11-server-Xwayland' | grep -vi '^xorg-x11-server-Xwayland-[0-9]' | head -1)
     [[ -z $cur ]] && return 1
     cur=${cur%%-[0-9]*}
     echo "  This system ships its own Xwayland ($cur), which conflicts with the one Hyprland's package asks for."
+    echo "  The swap is staged now and applied at the next reboot; Hyprland itself installs when you run this installer a second time."
+    echo "  (Your current system stays bootable: if anything looks wrong, pick the previous entry in the boot menu or run: rpm-ostree rollback)"
     local ans=y
     if [[ -r /dev/tty ]]; then read -r -p "  Swap it for Fedora's Xwayland so Hyprland can install? (older version, fine for Hyprland) [Y/n] " ans </dev/tty || ans=y; fi
     [[ $ans =~ ^[Nn] ]] && return 1
@@ -210,7 +212,15 @@ atomic_install() {
         ((rc == 0)) && { rm -f "$tmp"; return 0; }
         nf=$(sed -n 's/.*Packages not found: //p' "$tmp" | head -1)
         if [[ -z $nf ]]; then
-            grep -qi 'xwayland' "$tmp" && fix_xwayland && continue    # swapped Xwayland: try the whole batch again
+            if grep -qi 'xwayland' "$tmp" && fix_xwayland; then
+                # the swap only takes effect after a reboot, so Hyprland can't be layered yet: hold it back and do the rest now
+                XWL_PENDING=1; keep=()
+                for p in "${list[@]}"; do
+                    case $p in hyprland|xdg-desktop-portal-hyprland) DEFERRED+=("$p") ;; *) keep+=("$p") ;; esac
+                done
+                list=("${keep[@]}"); ((${#list[@]})) || { rm -f "$tmp"; return 0; }
+                continue
+            fi
             break
         fi
         echo "  Not in your Fedora's repos, skipping: $nf"
@@ -224,8 +234,6 @@ atomic_install() {
     echo "  Some packages conflict with this system, installing them one at a time..."
     for p in "${list[@]}"; do
         if sudo rpm-ostree install --idempotent --allow-inactive "$p" 2>&1 | tee "$tmp"; [[ ${PIPESTATUS[0]} -eq 0 ]]; then continue; fi
-        if grep -qi 'xwayland' "$tmp" && fix_xwayland \
-           && sudo rpm-ostree install --idempotent --allow-inactive "$p"; then continue; fi
         MISSING+=("$p")
     done
     rm -f "$tmp"
@@ -443,6 +451,15 @@ if command -v Hyprland >/dev/null && ! printf '0.56\n%s\n' "$(Hyprland --version
     echo "  WARNING: this config is written for Hyprland 0.56+ (the Lua config format). Your Hyprland looks older and may not load it."
 fi
 
+if ((XWL_PENDING)); then
+cat <<MSG
+
+Almost done. Reboot now, then run  ./install.sh  one more time to finish: ${DEFERRED[*]} could not be installed yet,
+because the Xwayland swap above only takes effect after a reboot. After the second run, reboot again and pick the Hyprland session.
+Everything else (configs, wallpapers, the other packages) is already in place.
+MSG
+exit 0
+fi
 cat <<MSG
 
 Done. Reboot, then pick the Hyprland session on the login screen.
