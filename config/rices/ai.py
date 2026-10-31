@@ -3,7 +3,9 @@
   ai.py <id>      focus the AI's window if it is open, otherwise launch it
   ai.py slot <n>  what Super+Shift+Ctrl+<n> does: the first time it asks "Which AI do you want?" and remembers the answer
   ai.py assign    change which AI a key opens
-  ai.py pick      menu of every AI (Super+Shift+Ctrl+A)
+  ai.py select    switch agent: pick which AI is "selected" and open it (Super+Shift+Ctrl+`)
+  ai.py open      open the selected AI (Super+Shift+Ctrl+A); asks first if none is selected yet
+  ai.py pick      plain menu of every AI (opens the one you click without selecting it)
   ai.py list      print the catalogue
 Number keys Super+Shift+Ctrl+1..0 map to the first ten entries of ORDER.
 Override a command without touching this file: ~/.config/hypr/ai-overrides.json  {"claude": "claude --some-flag"}"""
@@ -11,6 +13,7 @@ import json, os, pathlib, shlex, shutil, subprocess, sys
 
 HOME = pathlib.Path.home()
 OVERRIDES = HOME / ".config/hypr/ai-overrides.json"
+SELECTED = HOME / ".config/hypr/ai-selected.json"   # {"id": "claude"}
 SLOTS = HOME / ".config/hypr/ai-slots.json"      # {"1": "claude", ...} filled in as keys are used for the first time
 
 # id: (name, kind, command-or-url, install hint)   kind: cli | web
@@ -54,6 +57,45 @@ def installed(i):
     if first == "sh":                      # wrapper commands (ollama): check the real tool
         first = "ollama"
     return bool(shutil.which(first) or (HOME / ".local/bin" / first).exists())
+
+
+def logged_in(i):
+    """True / False for terminal AIs (best guess from their login files or API-key variables), None for web chats
+    (they use whatever your browser is signed in to) and for local models."""
+    name, kind, cmd, hint = CATALOG[i]
+    if kind == "web" or i == "ollama":
+        return None
+    h = HOME
+    env = os.environ.get
+    def has(*paths):
+        return any((h / p).exists() for p in paths)
+    if i == "claude":
+        try:
+            return "oauthAccount" in json.loads((h / ".claude.json").read_text()) or has(".claude/.credentials.json") or bool(env("ANTHROPIC_API_KEY"))
+        except (OSError, ValueError):
+            return has(".claude/.credentials.json") or bool(env("ANTHROPIC_API_KEY"))
+    if i == "codex":
+        return has(".codex/auth.json") or bool(env("OPENAI_API_KEY"))
+    if i == "gemini":
+        return has(".gemini/oauth_creds.json") or bool(env("GEMINI_API_KEY") or env("GOOGLE_API_KEY"))
+    if i == "opencode":
+        return has(".local/share/opencode/auth.json")
+    if i == "aider":
+        return any(env(k) for k in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "DEEPSEEK_API_KEY")) or has(".aider.conf.yml")
+    if i == "qwen":
+        return has(".qwen/oauth_creds.json") or bool(env("OPENAI_API_KEY"))
+    if i == "goose":
+        return has(".config/goose/config.yaml")
+    if i == "copilot-cli":
+        return has(".copilot/config.json", ".config/github-copilot/apps.json")
+    return None
+
+
+def status(i):
+    """● ready / signed in, ◐ installed but not signed in, ○ not installed"""
+    if not installed(i):
+        return "○"
+    return "◐" if logged_in(i) is False else "●"
 
 
 def clients():
@@ -108,7 +150,7 @@ def load_slots():
 def ask(title, ids, default=None):
     """Show a menu of AIs and return the chosen id (None if cancelled). The suggested one is listed first."""
     ids = ([default] if default in ids else []) + [i for i in ids if i != default]
-    lines = [f"{'●' if installed(i) else '○'}  {CATALOG[i][0]:<20} {'web' if CATALOG[i][1] == 'web' else 'terminal'}"
+    lines = [f"{status(i)}  {CATALOG[i][0]:<20} {'web' if CATALOG[i][1] == 'web' else 'terminal'}"
              + ("   (suggested)" if i == default else "") for i in ids]
     r = subprocess.run(["wofi", "--dmenu", "--prompt", title, "--width", "620", "--lines", str(min(len(lines), 12)),
                         "--insensitive", "--cache-file", "/dev/null"], input="\n".join(lines), text=True, capture_output=True)
@@ -130,6 +172,35 @@ def slot(n, force=False):
     launch(slots[n])
 
 
+def selected():
+    try:
+        i = json.loads(SELECTED.read_text()).get("id")
+        return i if i in CATALOG else None
+    except (OSError, ValueError):
+        return None
+
+
+def select():
+    """Switch agent: choose the AI that Super+Shift+Ctrl+A opens, and open it now."""
+    cur = selected()
+    choice = ask("Switch agent  (● ready, ◐ sign in needed, ○ not installed)", list(CATALOG), cur or ORDER[0])
+    if not choice:
+        return
+    SELECTED.parent.mkdir(parents=True, exist_ok=True)
+    SELECTED.write_text(json.dumps({"id": choice}))
+    notify(f"{CATALOG[choice][0]} is now your AI" + ("" if logged_in(choice) is not False else " (sign in when it opens)"))
+    launch(choice)
+
+
+def open_selected():
+    cur = selected()
+    if not cur:
+        return select()
+    if installed(cur) and logged_in(cur) is False:
+        notify(f"{CATALOG[cur][0]} isn't signed in yet: finish signing in in its window")
+    launch(cur)
+
+
 def notify(text):
     subprocess.run(["notify-send", "-t", "3000", "AI switcher", text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -149,11 +220,11 @@ def pick():
     for n, i in enumerate(CATALOG):
         name, kind, _, _ = CATALOG[i]
         key = f"Super+Shift+Ctrl+{keys[i]}" if i in keys else ""
-        mark = "●" if installed(i) else "○"
+        mark = status(i)
         lines.append(f"{mark}  {name:<20} {'web' if kind == 'web' else 'terminal':<9} {key}\t{i}")
     lines.append("⚙  Change which AI a key opens…\tassign")
     shown = [l.split("\t")[0] for l in lines]
-    r = subprocess.run(["wofi", "--dmenu", "--prompt", "AI  (● ready, ○ not installed)", "--width", "620", "--lines", str(len(shown)),
+    r = subprocess.run(["wofi", "--dmenu", "--prompt", "AI  (● ready, ◐ sign in needed, ○ not installed)", "--width", "620", "--lines", str(len(shown)),
                         "--insensitive"], input="\n".join(shown), text=True, capture_output=True)
     sel = r.stdout.rstrip("\n")
     if sel in shown:
@@ -165,13 +236,17 @@ if __name__ == "__main__":
     a = sys.argv[1] if len(sys.argv) > 1 else "pick"
     if a == "pick":
         pick()
+    elif a == "select":
+        select()
+    elif a == "open":
+        open_selected()
     elif a == "slot" and len(sys.argv) > 2:
         slot(sys.argv[2])
     elif a == "assign":
         assign()
     elif a == "list":
         for i, (name, kind, cmd, hint) in CATALOG.items():
-            print(f"{'●' if installed(i) else '○'} {i:12} {name:20} {kind}")
+            print(f"{status(i)} {i:12} {name:20} {kind}")
     elif a in CATALOG:
         launch(a)
     else:

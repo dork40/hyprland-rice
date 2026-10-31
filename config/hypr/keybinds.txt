@@ -1,5 +1,6 @@
 Super + Shift + Ctrl + 1..0  Jump to an AI (first press asks which one you want, then remembers)
-Super + Shift + Ctrl + A   AI menu: every assistant (open or switch)
+Super + Shift + Ctrl + `    Switch agent: pick which AI is yours (and open it)
+Super + Shift + Ctrl + A   Open your selected AI
 Super + F1                 Welcome: how to use the rice
 Super + /                  This cheat sheet
 Super + Enter              Terminal (kitty)

@@ -31,8 +31,9 @@ SECTIONS = [
         ("Super + scroll", "Next / previous workspace"),
     ]),
     ("AI assistants", [
-        ("Super + Shift + Ctrl + 1 to 0", "Jump to Claude, Codex, Gemini, OpenCode, Aider, Ollama or the web chats"),
-        ("Super + Shift + Ctrl + A", "Menu of every AI (opens it, or switches to it if it is already open)"),
+        ("Super + Shift + Ctrl + `", "Switch agent: pick which AI is yours (Claude, Codex, Gemini...)"),
+        ("Super + Shift + Ctrl + A", "Open your selected AI (jumps to it if it is already open)"),
+        ("Super + Shift + Ctrl + 1 to 0", "One key per AI, asks which one on first press"),
     ]),
     ("Handy", [
         ("Print", "Screenshot an area (Shift: window, Ctrl: whole screen)"),

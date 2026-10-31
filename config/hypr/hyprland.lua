@@ -369,13 +369,14 @@ hl.bind("XF86Launch3", hl.dsp.exec_cmd("rog-control-center"))
 
 -- Wallpaper picker
 hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("~/.config/hypr/scripts/wallpaper.sh"))
--- AI assistants: Super+Shift+Ctrl+1..0. The first time you press a key it asks "Which AI do you want?" and remembers it;
--- after that the key jumps to that AI (or opens it). Super+Shift+Ctrl+A is a menu of all of them.
+-- AI assistants. Super+Shift+Ctrl+` switches agent (pick which AI is yours); Super+Shift+Ctrl+A opens the selected one.
+-- Super+Shift+Ctrl+1..0: one key per AI. The first time you press a number it asks "Which AI do you want?" and remembers it.
 -- Suggested: 1 Claude Code  2 Codex  3 Gemini CLI  4 OpenCode  5 Aider  6 Ollama  7 ChatGPT  8 Claude.ai  9 Gemini  0 Perplexity
+hl.bind(mainMod .. " + SHIFT + CTRL + code:49", hl.dsp.exec_cmd("~/.config/rices/ai.py select"))
+hl.bind(mainMod .. " + SHIFT + CTRL + A", hl.dsp.exec_cmd("~/.config/rices/ai.py open"))
 for i = 1, 10 do
     hl.bind(mainMod .. " + SHIFT + CTRL + code:" .. (i == 10 and 19 or 9 + i), hl.dsp.exec_cmd("~/.config/rices/ai.py slot " .. (i % 10)))
 end
-hl.bind(mainMod .. " + SHIFT + CTRL + A", hl.dsp.exec_cmd("~/.config/rices/ai.py pick"))
 
 hl.bind(mainMod .. " + F1", hl.dsp.exec_cmd("~/.config/rices/welcome.py"))  -- Welcome: how to use the rice
 hl.bind(mainMod .. " + SHIFT + D", hl.dsp.exec_cmd("~/.config/rices/displays.py"))  -- Displays: resolution, refresh rate, multi-monitor layout

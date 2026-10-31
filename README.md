@@ -22,6 +22,12 @@ Existing configs are backed up to `~/.config-rice-backup-<date>` before anything
 
 ## AI switcher
 
+- **`Super+Shift+Ctrl+` ` `` ` `** (the backtick key) **switches agent**: a menu shows every AI with a status dot (● ready, ◐ installed but not signed in yet, ○ not installed). Pick one and it becomes your AI and opens.
+- **`Super+Shift+Ctrl+A`** opens your selected AI, or jumps to its window if it is already open. If you haven't picked one yet it asks first.
+- **`Super+Shift+Ctrl+1` to `0`** are one-key shortcuts, one per AI.
+
+Sign-in status is a best guess from each tool's login files or API-key variables. Web AIs use whatever your browser is signed in to.
+
 One key per assistant. **The first time you press a key it asks "Which AI do you want?"** (the suggested one is on top) and remembers your answer. After that the key jumps to that AI if it is already open, or opens it. Suggested defaults:
 
 | Key (with `Super+Shift+Ctrl`) | AI |
@@ -36,9 +42,9 @@ One key per assistant. **The first time you press a key it asks "Which AI do you
 | `8` | Claude.ai (web) |
 | `9` | Gemini (web) |
 | `0` | Perplexity (web) |
-| `A` | menu of all of them, plus Grok, Copilot, Le Chat, DeepSeek, Qwen Code, Goose and GitHub Copilot CLI |
+| other AIs | Grok, Copilot, Le Chat, DeepSeek, Qwen Code, Goose and GitHub Copilot CLI are in the switch-agent menu |
 
-Terminal AIs open in their own kitty window. If one isn't installed, the window shows the install command and offers to run it. Web AIs open as app windows in Chrome/Chromium (or your default browser). `ai.py list` shows what is installed. To change which AI a key opens later, use the "Change which AI a key opens" line in the `Super+Shift+Ctrl+A` menu (answers are kept in `~/.config/hypr/ai-slots.json`). To change a command, create `~/.config/hypr/ai-overrides.json`, for example `{"claude": "claude --model opus"}`.
+Terminal AIs open in their own kitty window. If one isn't installed, the window shows the install command and offers to run it. Web AIs open as app windows in Chrome/Chromium (or your default browser). `ai.py list` shows what is installed. To change which AI a key opens later, use the "Change which AI a key opens" line in the `Super+Shift+Ctrl+A`-menu (`ai.py pick`) or run `ai.py assign` (answers are kept in `~/.config/hypr/ai-slots.json`). To change a command, create `~/.config/hypr/ai-overrides.json`, for example `{"claude": "claude --model opus"}`.
 
 ## Welcome window
 
@@ -76,7 +82,8 @@ Anything the distro doesn't ship is listed at the end, so you know what to insta
 | `Super+W` | Wallpapers for the current style |
 | `Super+Shift+D` | Displays: resolution, refresh rate, scale, rotation, multi-monitor layout |
 | `Super+Shift+Ctrl+1` to `0` | AI switcher: jump to an AI assistant (see below) |
-| `Super+Shift+Ctrl+A` | AI menu with every assistant |
+| `Super+Shift+Ctrl+` + `` ` `` | Switch agent: pick which AI is yours |
+| `Super+Shift+Ctrl+A` | Open your selected AI |
 | `Super+F1` | Welcome window: how to open apps, move windows, change styles |
 | `Super+/` | Searchable cheat sheet of every shortcut |
 
