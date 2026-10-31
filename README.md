@@ -87,7 +87,7 @@ On your first login a **Welcome** window opens with the basics: how to open apps
 |---|---|
 | **Arch** (and Arch-based) | `pacman`, plus the AUR (`awww`, `blesh-git`, `rofimoji`) through `yay` or `paru` |
 | **Fedora** | `dnf`, with a Hyprland COPR for a current Hyprland: the installer tries [`solopasha/hyprland`](https://copr.fedorainfracloud.org/coprs/solopasha/hyprland/) and [`pm4rcin/Hyprland`](https://copr.fedorainfracloud.org/coprs/pm4rcin/Hyprland/) and uses whichever has packages for your Fedora version (Fedora 44 and newer at the moment) |
-| **Bazzite / Fedora Atomic** (Silverblue, Kinoite, Aurora) | `rpm-ostree` layering with the same COPR. The NVIDIA driver and your login screen are left alone. **Reboot after the install** to get the new packages, then pick the Hyprland session at login |
+| **Bazzite / Fedora Atomic** (Silverblue, Kinoite, Aurora) | `rpm-ostree` layering with the same COPR. The NVIDIA driver and your login screen are left alone. **Reboot after the install** to get the new packages, then pick the Hyprland session at login. Packages Fedora doesn't ship (for example SwayOSD) are skipped and listed; the volume and brightness keys then use plain notifications. Bazzite's own Xwayland conflicts with Hyprland's package, so the installer offers to swap it for Fedora's |
 | **Ubuntu / Debian** | `apt`; Hyprland and its companion tools are only installed if your release ships them |
 
 Anything the distro doesn't ship is listed at the end, so you know what to install by hand. The JetBrainsMono Nerd Font and the `starship` prompt are downloaded from their GitHub releases on non-Arch systems. Arch is the tested path; Fedora and Ubuntu are best-effort.

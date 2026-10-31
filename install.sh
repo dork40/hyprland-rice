@@ -188,15 +188,54 @@ has_pkg() {  # is this package available from the distro's repos?
         debian) [[ -n $(apt-cache policy "$1" 2>/dev/null | sed -n 's/^ *Candidate: //p' | grep -v '(none)') ]] ;;
     esac
 }
+# Immutable Fedora: Bazzite ships its own (Terra) Xwayland, which conflicts with the one Hyprland's package asks for.
+XWL_TRIED=0
+fix_xwayland() {
+    ((XWL_TRIED)) && return 1; XWL_TRIED=1
+    local cur; cur=$(rpm -qa 2>/dev/null | grep -i 'xorg-x11-server-Xwayland' | grep -vi '^xorg-x11-server-Xwayland-[0-9]' | head -1)
+    [[ -z $cur ]] && return 1
+    cur=${cur%%-[0-9]*}
+    echo "  This system ships its own Xwayland ($cur), which conflicts with the one Hyprland's package asks for."
+    local ans=y
+    if [[ -r /dev/tty ]]; then read -r -p "  Swap it for Fedora's Xwayland so Hyprland can install? (older version, fine for Hyprland) [Y/n] " ans </dev/tty || ans=y; fi
+    [[ $ans =~ ^[Nn] ]] && return 1
+    sudo rpm-ostree override remove "$cur" --install xorg-x11-server-Xwayland
+}
+# Layer packages with rpm-ostree: drop the ones Fedora doesn't have, then fall back to one at a time for conflicts.
+atomic_install() {
+    local list=("$@") tmp rc nf p keep attempt
+    tmp=$(mktemp)
+    for attempt in 1 2 3 4; do
+        set +e; sudo rpm-ostree install --idempotent --allow-inactive "${list[@]}" 2>&1 | tee "$tmp"; rc=${PIPESTATUS[0]}; set -e
+        ((rc == 0)) && { rm -f "$tmp"; return 0; }
+        nf=$(sed -n 's/.*Packages not found: //p' "$tmp" | head -1)
+        if [[ -z $nf ]]; then
+            grep -qi 'xwayland' "$tmp" && fix_xwayland && continue    # swapped Xwayland: try the whole batch again
+            break
+        fi
+        echo "  Not in your Fedora's repos, skipping: $nf"
+        keep=()
+        for p in "${list[@]}"; do
+            if [[ " $nf " == *" $p "* ]]; then MISSING+=("$p"); else keep+=("$p"); fi
+        done
+        list=("${keep[@]}")
+        ((${#list[@]})) || { rm -f "$tmp"; return 0; }
+    done
+    echo "  Some packages conflict with this system, installing them one at a time..."
+    for p in "${list[@]}"; do
+        if sudo rpm-ostree install --idempotent --allow-inactive "$p" 2>&1 | tee "$tmp"; [[ ${PIPESTATUS[0]} -eq 0 ]]; then continue; fi
+        if grep -qi 'xwayland' "$tmp" && fix_xwayland \
+           && sudo rpm-ostree install --idempotent --allow-inactive "$p"; then continue; fi
+        MISSING+=("$p")
+    done
+    rm -f "$tmp"
+}
+
 pkg_install() {
     case $DISTRO in
         arch)   sudo pacman -S --needed --noconfirm "$@" ;;
         fedora)
-            if ((ATOMIC)); then
-                # one transaction; if any package is unavailable, retry one by one and report the ones that failed
-                sudo rpm-ostree install --idempotent --allow-inactive "$@" && return 0
-                echo "  One of the packages wasn't available, trying them one at a time..."
-                for p in "$@"; do sudo rpm-ostree install --idempotent --allow-inactive "$p" || MISSING+=("$p"); done
+            if ((ATOMIC)); then atomic_install "$@"
             else
                 sudo dnf install -y "$@"
             fi ;;
@@ -391,7 +430,7 @@ absent=()
 if ((ATOMIC)); then
     echo "  Layered packages (Hyprland, Waybar, ...) are applied by rpm-ostree on the next boot, so they can't be checked yet."
 fi
-for c in Hyprland hyprctl waybar wofi dunst kitty swayosd-client hypridle hyprpaper wlogout starship awww cliphist \
+for c in Hyprland hyprctl waybar wofi dunst kitty hypridle hyprpaper wlogout starship awww cliphist \
          wl-copy grim slurp hyprpicker wf-recorder playerctl thunar sddm python3 ffmpeg curl notify-send; do
     command -v "$c" >/dev/null 2>&1 || [[ -x $HOME/.local/bin/$c ]] || absent+=("$c")
 done

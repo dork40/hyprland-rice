@@ -166,8 +166,11 @@ def apply(name):
         cur.parent.mkdir(parents=True, exist_ok=True)
         if cur.is_symlink() or cur.exists(): cur.unlink()
         cur.symlink_to(wp)
-        subprocess.Popen(["awww", "img", wp, "--transition-type", "grow", "--transition-pos", "0.5,0.5", "--transition-duration", "1.2"],
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        try:
+            subprocess.Popen(["awww", "img", wp, "--transition-type", "grow", "--transition-pos", "0.5,0.5", "--transition-duration", "1.2"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        except FileNotFoundError:
+            pass   # awww (the wallpaper tool) is not installed yet
     sh = lambda c: subprocess.run(c, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     sh("hyprctl reload")
     sh("pkill -USR1 -x kitty")
