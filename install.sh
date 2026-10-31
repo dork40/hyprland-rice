@@ -36,21 +36,21 @@ fi
 case $DISTRO in
 arch)
     PKGS=(hyprland waybar wofi dunst kitty swayosd hypridle hyprpaper wlogout starship ttf-jetbrains-mono-nerd
-          python python-gobject gtk4 gtk4-layer-shell ffmpeg curl libnotify xdg-desktop-portal-hyprland thunar
+          python python-gobject gtk4 gtk4-layer-shell ffmpeg curl libnotify xdg-desktop-portal-hyprland thunar sddm
           cliphist wl-clipboard grim slurp hyprpicker wf-recorder playerctl tesseract tesseract-data-eng btop udiskie
           network-manager-applet blueman polkit-kde-agent pavucontrol papirus-icon-theme breeze)
     AUR=(awww rofimoji)
     NVIDIA=(nvidia-open-dkms nvidia-utils lib32-nvidia-utils nvidia-settings libva-nvidia-driver egl-wayland linux-headers) ;;
 fedora)
     PKGS=(hyprland waybar wofi dunst kitty swayosd hypridle hyprpaper wlogout python3 python3-gobject gtk4
-          gtk4-layer-shell ffmpeg-free curl libnotify xdg-desktop-portal-hyprland thunar fontconfig xz
+          gtk4-layer-shell ffmpeg-free curl libnotify xdg-desktop-portal-hyprland thunar sddm fontconfig xz
           cliphist wl-clipboard grim slurp hyprpicker wf-recorder playerctl tesseract tesseract-langpack-eng btop udiskie
           network-manager-applet blueman polkit-kde pavucontrol papirus-icon-theme breeze-cursor-theme rofimoji)
     AUR=()
     NVIDIA=(akmod-nvidia xorg-x11-drv-nvidia-cuda libva-nvidia-driver egl-wayland) ;;
 debian)
     PKGS=(hyprland waybar wofi dunst kitty swayosd hypridle hyprpaper wlogout python3 python3-gi gir1.2-gtk-4.0
-          gir1.2-gtk4layershell-1.0 libgtk4-layer-shell0 ffmpeg curl libnotify-bin xdg-desktop-portal-hyprland thunar
+          gir1.2-gtk4layershell-1.0 libgtk4-layer-shell0 ffmpeg curl libnotify-bin xdg-desktop-portal-hyprland thunar sddm
           fontconfig xz-utils cliphist wl-clipboard grim slurp hyprpicker wf-recorder playerctl tesseract-ocr
           tesseract-ocr-eng btop udiskie network-manager-gnome blueman polkit-kde-agent-1 pavucontrol
           papirus-icon-theme breeze-cursor-theme rofimoji)
@@ -66,7 +66,23 @@ HAS_NVIDIA=0; HAS_OTHER=0
 grep -qi nvidia <<<"$gpus" && HAS_NVIDIA=1
 grep -Eqi '\b(amd|ati)\b|intel' <<<"$gpus" && HAS_OTHER=1
 
-MISSING=()
+MISSING=(); SKIPPED=()
+# package -> the command it provides, so a hand-built or differently packaged tool also counts as "already there"
+declare -A CMD_OF=([hyprland]=Hyprland [waybar]=waybar [wofi]=wofi [dunst]=dunst [kitty]=kitty [swayosd]=swayosd-server
+    [hypridle]=hypridle [hyprpaper]=hyprpaper [wlogout]=wlogout [starship]=starship [thunar]=thunar [cliphist]=cliphist
+    [wl-clipboard]=wl-copy [grim]=grim [slurp]=slurp [hyprpicker]=hyprpicker [wf-recorder]=wf-recorder [playerctl]=playerctl
+    [btop]=btop [udiskie]=udiskie [network-manager-applet]=nm-applet [network-manager-gnome]=nm-applet [blueman]=blueman-manager
+    [pavucontrol]=pavucontrol [rofimoji]=rofimoji [awww]=awww [sddm]=sddm [brightnessctl]=brightnessctl [tesseract]=tesseract
+    [tesseract-ocr]=tesseract [curl]=curl [ffmpeg]=ffmpeg [ffmpeg-free]=ffmpeg)
+installed_pkg() {
+    case $DISTRO in
+        arch)   pacman -Qq "$1" &>/dev/null ;;
+        fedora) rpm -q "$1" &>/dev/null ;;
+        debian) dpkg -s "$1" &>/dev/null ;;
+        *) return 1 ;;
+    esac
+}
+have() { installed_pkg "$1" || { [[ -n ${CMD_OF[$1]:-} ]] && command -v "${CMD_OF[$1]}" >/dev/null 2>&1; }; }
 has_pkg() {  # is this package available from the distro's repos?
     case $DISTRO in
         arch)   pacman -Si "$1" &>/dev/null ;;
@@ -115,21 +131,46 @@ else
     say "Installing packages (anything your distro doesn't ship is listed at the end)"
     want=()
     for p in "${PKGS[@]}"; do
-        if has_pkg "$p"; then want+=("$p"); else MISSING+=("$p"); fi
+        if have "$p"; then SKIPPED+=("$p")
+        elif has_pkg "$p"; then want+=("$p")
+        else MISSING+=("$p"); fi
     done
-    ((${#want[@]})) && pkg_install "${want[@]}"
+    ((${#SKIPPED[@]})) && echo "  Already installed, skipping: ${SKIPPED[*]}"
+    if ((${#want[@]})); then echo "  Installing: ${want[*]}"; pkg_install "${want[@]}"; else echo "  Nothing to install from the repos."; fi
     if [[ $DISTRO == arch ]]; then
         helper=$(command -v yay || command -v paru || true)
         if [[ -n $helper ]]; then
             say "Installing AUR packages with ${helper##*/}"
-            "$helper" -S --needed --noconfirm "${AUR[@]}" || MISSING+=("${AUR[@]}")
+            aur_want=(); for p in "${AUR[@]}"; do have "$p" || aur_want+=("$p"); done
+            ((${#aur_want[@]})) && { "$helper" -S --needed --noconfirm "${aur_want[@]}" || MISSING+=("${aur_want[@]}"); }
         else
-            MISSING+=("${AUR[@]}"); echo "No yay/paru found: install these from the AUR yourself: ${AUR[*]}"
+            for p in "${AUR[@]}"; do have "$p" || MISSING+=("$p"); done
+            echo "No yay/paru found: install the missing AUR packages yourself (${AUR[*]})"
         fi
     fi
     install_nerd_font
     [[ $DISTRO != arch ]] && install_starship
 fi
+
+# ---- SDDM: the login screen, set to start Hyprland ----------------------------------------
+setup_sddm() {
+    command -v sddm >/dev/null || return 0
+    say "Setting up SDDM as your login screen"
+    local current; current=$(basename "$(readlink /etc/systemd/system/display-manager.service 2>/dev/null)" 2>/dev/null || true)
+    [[ $DISTRO == debian ]] && echo /usr/bin/sddm | sudo tee /etc/X11/default-display-manager >/dev/null
+    sudo systemctl enable -f sddm.service
+    sudo mkdir -p /var/lib/sddm
+    if [[ ! -e /var/lib/sddm/state.conf ]]; then   # preselect the Hyprland session the first time
+        local sess=/usr/share/wayland-sessions/hyprland.desktop
+        [[ -e $sess ]] && printf '[Last]\nSession=%s\n' "$sess" | sudo tee /var/lib/sddm/state.conf >/dev/null
+    fi
+    if [[ -n $current && $current != sddm.service && $current != . ]]; then
+        echo "  Switched your login screen from ${current%.service} to SDDM. It takes effect at the next reboot."
+    else
+        echo "  SDDM will start at the next boot with Hyprland preselected."
+    fi
+}
+[[ $DISTRO != unknown ]] && setup_sddm
 
 # ---- NVIDIA ----------------------------------------------------------------------------
 if ((HAS_NVIDIA)) && [[ $DISTRO != unknown ]]; then
@@ -215,7 +256,7 @@ say "Generating the default style (noir)"
 say "Dependency check"
 absent=()
 for c in Hyprland hyprctl waybar wofi dunst kitty swayosd-client hypridle hyprpaper wlogout starship awww cliphist \
-         wl-copy grim slurp hyprpicker wf-recorder playerctl thunar python3 ffmpeg curl notify-send; do
+         wl-copy grim slurp hyprpicker wf-recorder playerctl thunar sddm python3 ffmpeg curl notify-send; do
     command -v "$c" >/dev/null 2>&1 || [[ -x $HOME/.local/bin/$c ]] || absent+=("$c")
 done
 if ((${#absent[@]})); then
@@ -229,7 +270,7 @@ fi
 
 cat <<MSG
 
-Done. Log out and pick "Hyprland" at the login screen (or run: Hyprland).
+Done. Reboot, then log in from the SDDM screen (Hyprland is preselected).
   Super+Shift+R   switch rice style (Wardrobe)       Super+W   wallpapers
   Super+Shift+D   displays                           Super+F1  welcome / how to use it
   Super+/         cheat sheet of every shortcut

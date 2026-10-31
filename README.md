@@ -31,7 +31,7 @@ cd hyprland-rice
 ./install.sh   # installs everything: packages (asks for sudo), configs, wallpapers, the apps below
 ```
 
-The installer is all-in-one: there are no options to pick through. It installs only what the rice itself uses: Hyprland and its helpers (hypridle, hyprpaper, hyprpicker), Waybar, wofi, dunst, kitty, swayosd, wlogout, thunar (files), clipboard history, screenshots and screen recording, media keys, the volume/network/Bluetooth applets, the starship prompt and the JetBrainsMono Nerd Font. It does not install anyone's personal apps.
+The installer is all-in-one: there are no options to pick through. It checks every package one by one and **skips what you already have** (already running Hyprland but no wofi? It installs just wofi, and the rest). It also installs **SDDM** as your login screen and sets it to start Hyprland. It installs only what the rice itself uses: Hyprland and its helpers (hypridle, hyprpaper, hyprpicker), Waybar, wofi, dunst, kitty, swayosd, wlogout, thunar (files), clipboard history, screenshots and screen recording, media keys, the volume/network/Bluetooth applets, the starship prompt and the JetBrainsMono Nerd Font. It does not install anyone's personal apps.
 
 Existing configs are backed up to `~/.config-rice-backup-<date>` before anything is overwritten.
 
