@@ -3,12 +3,10 @@
 ------------------
 
 -- See https://wiki.hypr.land/Configuring/Basics/Monitors/
-hl.monitor({
-    output   = "eDP-1",
-    mode     = "1920x1200@165Hz",
-    position = "0x0",
-    scale    = "1.25",
-})
+-- Screens are set with the Displays app (Super+Shift+D); it saves them to monitors.lua
+if not pcall(dofile, os.getenv("HOME") .. "/.config/hypr/monitors.lua") then
+    hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "1" })
+end
 
 -- X11 apps (Steam, games, launchers) draw at the real 1920x1200
 -- instead of 1536x960 stretched up, so they're sharp instead of blurry
@@ -370,6 +368,7 @@ hl.bind("XF86Launch3", hl.dsp.exec_cmd("rog-control-center"))
 
 -- Wallpaper picker
 hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("~/.config/hypr/scripts/wallpaper.sh"))
+hl.bind(mainMod .. " + SHIFT + D", hl.dsp.exec_cmd("~/.config/rices/displays.py"))  -- Displays: resolution, refresh rate, multi-monitor layout
 hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd("~/.config/rices/wardrobe.py pick"))  -- Wardrobe: switch rice style
 
 -- Window switcher: every open window across workspaces
@@ -445,7 +444,7 @@ hl.layer_rule({
 -- Small utility windows open floating and centred instead of tiling
 hl.window_rule({
     name   = "float-utilities",
-    match  = { class = "^(org.pulseaudio.pavucontrol|pavucontrol|blueman-manager|nm-connection-editor|nm-applet|org.kde.polkit-kde-authentication-agent-1|xdg-desktop-portal-gtk|btop)$" },
+    match  = { class = "^(org.pulseaudio.pavucontrol|pavucontrol|blueman-manager|nm-connection-editor|nm-applet|org.kde.polkit-kde-authentication-agent-1|xdg-desktop-portal-gtk|btop|dev.rice.Displays)$" },
     float  = true,
     center = true,
     size   = "900 600",

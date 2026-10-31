@@ -189,6 +189,21 @@ LUA
     fi
 fi
 
+say "Adding the Displays app to your app launcher"
+run mkdir -p "$HOME/.local/share/applications"
+if ((DRY)); then echo "  [dry-run] ~/.local/share/applications/rice-displays.desktop"; else cat >"$HOME/.local/share/applications/rice-displays.desktop" <<DESK
+[Desktop Entry]
+Type=Application
+Name=Displays
+Comment=Resolution, refresh rate and multi-monitor layout
+Exec=$CFG/rices/displays.py
+Icon=preferences-desktop-display
+Categories=Settings;
+Terminal=false
+StartupWMClass=dev.rice.Displays
+DESK
+fi
+
 say "Copying wallpapers to ~/Pictures/wallpapers"
 run mkdir -p "$HOME/Pictures/wallpapers"
 run cp -an "$HERE"/wallpapers/. "$HOME/Pictures/wallpapers/"

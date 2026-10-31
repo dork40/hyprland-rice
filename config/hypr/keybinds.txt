@@ -30,6 +30,7 @@ Super + Shift + V          Clipboard history
 Super + .                  Emoji picker
 Super + =                  Calculator
 Super + W                  Pick a wallpaper
+Super + Shift + D          Displays: resolution, refresh rate, multi-monitor layout
 Super + Shift + R          Wardrobe: switch rice style
 Super + N                  Do not disturb on / off
 Super + F7 / F8            Screen brightness down / up

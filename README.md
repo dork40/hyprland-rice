@@ -20,6 +20,16 @@ cd hyprland-rice
 
 Existing configs are backed up to `~/.config-rice-backup-<date>` before anything is overwritten.
 
+## Displays app
+
+`Super+Shift+D` (or "Displays" in your app launcher) opens a screen settings window:
+
+- pick **resolution**, **refresh rate**, **scale** and **rotation** for each monitor
+- **drag the screens** to arrange them side by side (they snap together), or use the ◀ ▶ ▲ ▼ buttons to place one next to another
+- **mirror** one screen onto another, or switch a screen off
+- **Apply** shows a 15-second "keep these settings?" countdown and reverts by itself if you don't confirm, so a bad setting can't lock you out
+- **Keep** saves the layout to `~/.config/hypr/monitors.lua`, which Hyprland loads at every start
+
 ## Supported distros
 
 `install.sh` detects your distro and installs the dependencies with its package manager:
@@ -40,6 +50,7 @@ Anything the distro doesn't ship is listed at the end, so you know what to insta
 |---|---|
 | `Super+Shift+R` | Wardrobe: pick a style |
 | `Super+W` | Wallpapers for the current style |
+| `Super+Shift+D` | Displays: resolution, refresh rate, scale, rotation, multi-monitor layout |
 | `Super+/` | Searchable cheat sheet of every shortcut |
 
 ## NVIDIA
