@@ -237,7 +237,7 @@ rpmostree_wait() {
 # Is the Xwayland swap already staged (terra's still installed, but its removal is queued for the next boot)?
 swap_pending() {
     rpm -qa 2>/dev/null | grep -qi '^terra-xorg-x11-server-Xwayland' || return 1
-    rpm-ostree status 2>/dev/null | grep -qi 'terra-xorg-x11-server-Xwayland'
+    rpm-ostree status -v 2>/dev/null | grep -qi 'terra-xorg-x11-server-Xwayland'
 }
 # Layer packages with rpm-ostree: drop the ones Fedora doesn't have, then fall back to one at a time for conflicts.
 atomic_install() {
@@ -257,6 +257,16 @@ atomic_install() {
         ((rc == 0)) && { rm -f "$tmp"; return 0; }
         nf=$(sed -n 's/.*Packages not found: //p' "$tmp" | head -1)
         if [[ -z $nf ]]; then
+            if grep -qi 'Inactive base removals' "$tmp" && grep -qi 'terra-xorg-x11-server-Xwayland' "$tmp"; then
+                # the swap is ALREADY staged (rpm-ostree lists it in its own error output): Hyprland just has to wait for the reboot
+                echo "  The Xwayland swap is already staged for the next boot. Hyprland can only be installed after that reboot."
+                XWL_PENDING=1; XWL_MODE=swap; keep=()
+                for p in "${list[@]}"; do
+                    case $p in hyprland|xdg-desktop-portal-hyprland) DEFERRED+=("$p") ;; *) keep+=("$p") ;; esac
+                done
+                list=("${keep[@]}"); ((${#list[@]})) || { rm -f "$tmp"; return 0; }
+                continue
+            fi
             if { grep -qi 'xwayland' "$tmp" || { printf '%s\n' "${list[@]}" | grep -qx hyprland && rpm -qa 2>/dev/null | grep -qi '^terra-xorg-x11-server-Xwayland'; }; } && fix_xwayland; then
                 XWL_PENDING=1; keep=()
                 for p in "${list[@]}"; do
