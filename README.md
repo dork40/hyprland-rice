@@ -28,10 +28,10 @@ Wallpapers are public-domain NASA photos (credits in `wallpapers/CREDITS.md`).
 ```sh
 git clone https://github.com/dork40/hyprland-rice.git
 cd hyprland-rice
-./install.sh              # packages (asks for sudo) + configs + wallpapers
-./install.sh --no-packages  # configs only
-./install.sh --dry-run      # show what it would do
+./install.sh   # installs everything: packages (asks for sudo), configs, wallpapers, the apps below
 ```
+
+The installer is all-in-one: there are no options to pick through. It installs only what the rice itself uses: Hyprland and its helpers (hypridle, hyprpaper, hyprpicker), Waybar, wofi, dunst, kitty, swayosd, wlogout, thunar (files), clipboard history, screenshots and screen recording, media keys, the volume/network/Bluetooth applets, the starship prompt and the JetBrainsMono Nerd Font. It does not install anyone's personal apps.
 
 Existing configs are backed up to `~/.config-rice-backup-<date>` before anything is overwritten.
 
@@ -115,8 +115,7 @@ Anything the distro doesn't ship is listed at the end, so you know what to insta
 
 ## Notes
 
-- `config/hypr/hyprland.lua` uses the **Lua config** of recent Hyprland and sets the built-in screen to `eDP-1` 1920x1200@165Hz at 1.25 scale. Edit the `hl.monitor` block for your display.
-- Some scripts are laptop-specific (ASUS fan/RGB keys, battery limit, voice dictation). They do nothing without that hardware.
+- `config/hypr/hyprland.lua` uses the **Lua config** of recent Hyprland (written against 0.56). Screens are managed by the Displays app (`Super+Shift+D`); until you save a layout, Hyprland auto-detects them.
 - Weather defaults to a location guessed from your IP. Set `WEATHER_LOCATION="City,State"` to pin it.
 - Fonts: JetBrainsMono Nerd Font. Cursor: Breeze_Light. Icons: Papirus-Dark.
 - Edit styles in `config/rices/wardrobe.py` (palette + Hyprland values per style) and the shared base files in `config/rices/base/`. Do not edit the generated `waybar/style.css`, `wofi/style.css`, etc.: they are rewritten on every switch.

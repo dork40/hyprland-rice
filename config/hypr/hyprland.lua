@@ -18,7 +18,7 @@ hl.config({ xwayland = { force_zero_scaling = true } })
 
 -- Set programs that you use
 local terminal    = "kitty"
-local fileManager = "dolphin"
+local fileManager = "thunar"
 local menu = "wofi"
 
 -------------------
@@ -43,16 +43,9 @@ hl.on("hyprland.start", function ()
   hl.exec_cmd("~/.config/hypr/scripts/wallpaper-restore.sh")
   hl.exec_cmd("swayosd-server")
   hl.exec_cmd("hypridle -c ~/.config/hypr/hypridle-sleeponly.conf")  -- screen timeout starts OFF; turn it on with the Waybar button
-  hl.exec_cmd("~/.config/hypr/scripts/easyeffects-start.sh")  -- speaker effects, always the Laptop preset
-  hl.exec_cmd("~/.config/hypr/scripts/mangohud.sh apply")  -- MangoHud on/off, saved from the Waybar button
-  hl.exec_cmd("~/.config/hypr/scripts/powerwatch.sh")  -- turbo/game mode switch off when the charger is unplugged
-  -- hl.exec_cmd("~/.config/hypr/scripts/autogame.sh")    -- off by request: game mode no longer turns itself on for games
   hl.exec_cmd("sh -c 'dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE; systemctl --user reset-failed xdg-desktop-portal-hyprland; systemctl --user restart xdg-desktop-portal-hyprland xdg-desktop-portal'")  -- screen sharing/OBS: the portal can crash if it starts before Hyprland after a re-login
   hl.exec_cmd("dunst")
   hl.exec_cmd("~/.config/rices/welcome.py --first-run")  -- one-time welcome window (reopen with Super+F1)
-  hl.exec_cmd("~/.config/hypr/scripts/voxtype-run.sh")  -- dictation daemon (needs the input group, so not the systemd user service)
-  hl.exec_cmd("/usr/lib/pam_kwallet_init")  -- unlocks the password keychain with your login (no KWallet popup)
-  hl.exec_cmd("command -v kclockd && kclockd")  -- KClock alarms ring even with the Clock window closed
   hl.exec_cmd("udiskie --automount --notify --smart-tray")  -- USB drives mount by themselves
   hl.exec_cmd("~/.config/hypr/scripts/battery-warn.sh")     -- low battery warnings at 15% and 5%
   hl.exec_cmd("/usr/lib/polkit-kde-authentication-agent-1")
@@ -72,7 +65,6 @@ hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
 hl.env("XCURSOR_THEME", "Breeze_Light")
 hl.env("HYPRCURSOR_THEME", "Breeze_Light")
-hl.env("QT_QPA_PLATFORMTHEME", "kde")  -- KDE apps (Dolphin etc.) use the Noir colour scheme
 
 -----------------------
 ----- PERMISSIONS -----
@@ -268,13 +260,6 @@ hl.device({
     sensitivity = -0.5,
 })
 
--- Laptop touchpad: adaptive accel so slow finger moves stay precise (the mouse stays flat)
-hl.device({
-    name          = "asup1205:00-093a:2008-touchpad",
-    sensitivity   = 0.05,
-    accel_profile = "adaptive",
-})
-
 ---------------------
 ---- KEYBINDINGS ----
 ---------------------
@@ -287,14 +272,7 @@ local closeWindowBind = hl.bind(mainMod .. " + C", hl.dsp.window.close())
 -- closeWindowBind:set_enabled(false)
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'"))
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
-hl.bind(mainMod .. " + B",         hl.dsp.exec_cmd("google-chrome-stable"))  -- browser (change to your own)
-hl.bind(mainMod .. " + Z", hl.dsp.exec_cmd("true"))  -- dictation: voxtype handles hold-to-talk itself ([hotkey] in its config); this just keeps Super+Z out of apps
-
--- Voxtype switches here while it types, so a still-held Super can't turn the dictated letters into shortcuts.
--- F12 is the escape hatch if it ever gets stuck.
-hl.define_submap("voxtype_suppress", function()
-    hl.bind("F12", hl.dsp.submap("reset"))
-end)
+hl.bind(mainMod .. " + B",         hl.dsp.exec_cmd("xdg-open https://duckduckgo.com"))  -- opens your default browser
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
 hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit"))    -- dwindle only
 hl.bind(mainMod .. " + R", hl.dsp.exec_cmd("wofi --show drun"))
@@ -357,13 +335,6 @@ hl.bind("XF86AudioPause", hl.dsp.exec_cmd("playerctl play-pause"), { locked = tr
 hl.bind("XF86AudioPlay",  hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
 hl.bind("XF86AudioPrev",  hl.dsp.exec_cmd("playerctl previous"),   { locked = true })
 
--- ASUS keys: keyboard backlight and performance profile (the ROG / fan key)
-hl.bind("XF86KbdBrightnessUp",   hl.dsp.exec_cmd("asusctl leds next"), { locked = true })
-hl.bind("XF86KbdBrightnessDown", hl.dsp.exec_cmd("asusctl leds prev"), { locked = true })
-hl.bind("XF86Launch4",           hl.dsp.exec_cmd("~/.config/hypr/scripts/asus-profile.sh next"))  -- Fn+F5 fan key
-
--- Armoury Crate key opens ROG Control Center (the key code differs between models)
-hl.bind("XF86Launch1", hl.dsp.exec_cmd("rog-control-center"))
 hl.bind("XF86Launch2", hl.dsp.exec_cmd("rog-control-center"))
 hl.bind("XF86Launch3", hl.dsp.exec_cmd("rog-control-center"))
 
@@ -391,7 +362,6 @@ hl.bind(mainMod .. " + SHIFT + C",     hl.dsp.exec_cmd("~/.config/hypr/scripts/c
 hl.bind(mainMod .. " + equal",         hl.dsp.exec_cmd("~/.config/hypr/scripts/calc.sh"))
 hl.bind(mainMod .. " + grave",         hl.dsp.exec_cmd("~/.config/hypr/scripts/dropdown.sh"))
 hl.bind(mainMod .. " + SHIFT + T",     hl.dsp.exec_cmd("~/.config/hypr/scripts/ocr.sh"))  -- copy text from the screen
-hl.bind(mainMod .. " + SHIFT + L",     hl.dsp.exec_cmd("~/.config/hypr/scripts/voxtype-translate.sh"))  -- dictation: toggle translate-to-English
 hl.bind(mainMod .. " + slash",         hl.dsp.exec_cmd("~/.config/hypr/scripts/keybinds.sh"))  -- shortcut cheat sheet
 
 --------------------------------
@@ -493,17 +463,6 @@ hl.layer_rule({
     match = { namespace = "^swayosd$" },
     blur  = true,
     ignore_alpha = 0,
-})
-
--- HyprMod (GUI settings/keybind editor) saves its changes here
-require("hyprland-gui")
-
--- CS2 (native Linux, runs under XWayland): open fullscreen. As a tiled window on this 1.25x-scaled screen
--- its mouse-look broke (the game re-centres the cursor and the warps land wrong in a scaled XWayland window).
-hl.window_rule({
-    name       = "cs2-fullscreen",
-    match      = { class = "^cs2$" },
-    fullscreen = true,
 })
 
 -- NVIDIA environment (written by install.sh only on machines where NVIDIA drives the display)
