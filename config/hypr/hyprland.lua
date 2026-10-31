@@ -369,10 +369,11 @@ hl.bind("XF86Launch3", hl.dsp.exec_cmd("rog-control-center"))
 
 -- Wallpaper picker
 hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("~/.config/hypr/scripts/wallpaper.sh"))
--- AI assistants: Super+Shift+Ctrl+1..0 jump to (or open) each one, Super+Shift+Ctrl+A opens a menu of all of them
--- 1 Claude Code  2 Codex  3 Gemini CLI  4 OpenCode  5 Aider  6 Ollama  7 ChatGPT  8 Claude.ai  9 Gemini  0 Perplexity
-for i, id in ipairs({ "claude", "codex", "gemini", "opencode", "aider", "ollama", "chatgpt", "claude-web", "gemini-web", "perplexity" }) do
-    hl.bind(mainMod .. " + SHIFT + CTRL + code:" .. (i == 10 and 19 or 9 + i), hl.dsp.exec_cmd("~/.config/rices/ai.py " .. id))
+-- AI assistants: Super+Shift+Ctrl+1..0. The first time you press a key it asks "Which AI do you want?" and remembers it;
+-- after that the key jumps to that AI (or opens it). Super+Shift+Ctrl+A is a menu of all of them.
+-- Suggested: 1 Claude Code  2 Codex  3 Gemini CLI  4 OpenCode  5 Aider  6 Ollama  7 ChatGPT  8 Claude.ai  9 Gemini  0 Perplexity
+for i = 1, 10 do
+    hl.bind(mainMod .. " + SHIFT + CTRL + code:" .. (i == 10 and 19 or 9 + i), hl.dsp.exec_cmd("~/.config/rices/ai.py slot " .. (i % 10)))
 end
 hl.bind(mainMod .. " + SHIFT + CTRL + A", hl.dsp.exec_cmd("~/.config/rices/ai.py pick"))
 

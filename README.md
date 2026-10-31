@@ -22,7 +22,7 @@ Existing configs are backed up to `~/.config-rice-backup-<date>` before anything
 
 ## AI switcher
 
-One key per assistant. If it is already open you jump straight to it, otherwise it opens:
+One key per assistant. **The first time you press a key it asks "Which AI do you want?"** (the suggested one is on top) and remembers your answer. After that the key jumps to that AI if it is already open, or opens it. Suggested defaults:
 
 | Key (with `Super+Shift+Ctrl`) | AI |
 |---|---|
@@ -38,7 +38,7 @@ One key per assistant. If it is already open you jump straight to it, otherwise 
 | `0` | Perplexity (web) |
 | `A` | menu of all of them, plus Grok, Copilot, Le Chat, DeepSeek, Qwen Code, Goose and GitHub Copilot CLI |
 
-Terminal AIs open in their own kitty window. If one isn't installed, the window shows the install command and offers to run it. Web AIs open as app windows in Chrome/Chromium (or your default browser). `ai.py list` shows what is installed. To change a command, create `~/.config/hypr/ai-overrides.json`, for example `{"claude": "claude --model opus"}`.
+Terminal AIs open in their own kitty window. If one isn't installed, the window shows the install command and offers to run it. Web AIs open as app windows in Chrome/Chromium (or your default browser). `ai.py list` shows what is installed. To change which AI a key opens later, use the "Change which AI a key opens" line in the `Super+Shift+Ctrl+A` menu (answers are kept in `~/.config/hypr/ai-slots.json`). To change a command, create `~/.config/hypr/ai-overrides.json`, for example `{"claude": "claude --model opus"}`.
 
 ## Welcome window
 

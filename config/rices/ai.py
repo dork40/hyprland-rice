@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """AI switcher: jump to (or open) any AI assistant with one key.
   ai.py <id>      focus the AI's window if it is open, otherwise launch it
+  ai.py slot <n>  what Super+Shift+Ctrl+<n> does: the first time it asks "Which AI do you want?" and remembers the answer
+  ai.py assign    change which AI a key opens
   ai.py pick      menu of every AI (Super+Shift+Ctrl+A)
   ai.py list      print the catalogue
 Number keys Super+Shift+Ctrl+1..0 map to the first ten entries of ORDER.
@@ -9,6 +11,7 @@ import json, os, pathlib, shlex, shutil, subprocess, sys
 
 HOME = pathlib.Path.home()
 OVERRIDES = HOME / ".config/hypr/ai-overrides.json"
+SLOTS = HOME / ".config/hypr/ai-slots.json"      # {"1": "claude", ...} filled in as keys are used for the first time
 
 # id: (name, kind, command-or-url, install hint)   kind: cli | web
 CATALOG = {
@@ -95,6 +98,51 @@ def launch(i):
                      start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
+def load_slots():
+    try:
+        return json.loads(SLOTS.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def ask(title, ids, default=None):
+    """Show a menu of AIs and return the chosen id (None if cancelled). The suggested one is listed first."""
+    ids = ([default] if default in ids else []) + [i for i in ids if i != default]
+    lines = [f"{'●' if installed(i) else '○'}  {CATALOG[i][0]:<20} {'web' if CATALOG[i][1] == 'web' else 'terminal'}"
+             + ("   (suggested)" if i == default else "") for i in ids]
+    r = subprocess.run(["wofi", "--dmenu", "--prompt", title, "--width", "620", "--lines", str(min(len(lines), 12)),
+                        "--insensitive", "--cache-file", "/dev/null"], input="\n".join(lines), text=True, capture_output=True)
+    sel = r.stdout.rstrip("\n")
+    return ids[lines.index(sel)] if sel in lines else None
+
+
+def slot(n, force=False):
+    slots = load_slots()
+    if force or n not in slots:
+        default = ORDER[(int(n) - 1) % 10] if n.isdigit() and 1 <= int(n) <= 10 else None
+        choice = ask(f"Which AI do you want on Super+Shift+Ctrl+{n}?", list(CATALOG), default)
+        if not choice:
+            return
+        slots[n] = choice
+        SLOTS.parent.mkdir(parents=True, exist_ok=True)
+        SLOTS.write_text(json.dumps(slots, indent=1))
+        notify(f"{CATALOG[choice][0]} is now on Super+Shift+Ctrl+{n}")
+    launch(slots[n])
+
+
+def notify(text):
+    subprocess.run(["notify-send", "-t", "3000", "AI switcher", text], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def assign():
+    r = subprocess.run(["wofi", "--dmenu", "--prompt", "Change which key?", "--lines", "10", "--insensitive", "--cache-file", "/dev/null"],
+                       input="\n".join(f"Super+Shift+Ctrl+{k}   (now: {CATALOG[load_slots().get(k, ORDER[(int(k) - 1) % 10])][0]})"
+                                       for k in "1234567890"), text=True, capture_output=True)
+    sel = r.stdout.strip()
+    if sel.startswith("Super+Shift+Ctrl+"):
+        slot(sel[len("Super+Shift+Ctrl+")], force=True)
+
+
 def pick():
     keys = {i: (n + 1) % 10 for n, i in enumerate(ORDER)}
     lines = []
@@ -103,18 +151,24 @@ def pick():
         key = f"Super+Shift+Ctrl+{keys[i]}" if i in keys else ""
         mark = "●" if installed(i) else "○"
         lines.append(f"{mark}  {name:<20} {'web' if kind == 'web' else 'terminal':<9} {key}\t{i}")
+    lines.append("⚙  Change which AI a key opens…\tassign")
     shown = [l.split("\t")[0] for l in lines]
     r = subprocess.run(["wofi", "--dmenu", "--prompt", "AI  (● ready, ○ not installed)", "--width", "620", "--lines", str(len(shown)),
                         "--insensitive"], input="\n".join(shown), text=True, capture_output=True)
     sel = r.stdout.rstrip("\n")
     if sel in shown:
-        launch(lines[shown.index(sel)].split("\t")[1])
+        target = lines[shown.index(sel)].split("\t")[1]
+        assign() if target == "assign" else launch(target)
 
 
 if __name__ == "__main__":
     a = sys.argv[1] if len(sys.argv) > 1 else "pick"
     if a == "pick":
         pick()
+    elif a == "slot" and len(sys.argv) > 2:
+        slot(sys.argv[2])
+    elif a == "assign":
+        assign()
     elif a == "list":
         for i, (name, kind, cmd, hint) in CATALOG.items():
             print(f"{'●' if installed(i) else '○'} {i:12} {name:20} {kind}")
