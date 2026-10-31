@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Max performance for a desktop PC: CPU and GPU pinned to full speed, every fan header at 100%.
+#   rice-max-performance on    apply (run at boot by rice-max-performance.service)
+#   rice-max-performance off   hand control back to the system (automatic fans, normal governors)
+# Needs root. Every write is best-effort: hardware that doesn't expose a knob is skipped.
+# SYS can point at a fake /sys tree for testing.
+SYS=${SYS:-/sys}
+mode=${1:-on}
+
+put() { [ -w "$2" ] && echo "$1" >"$2" 2>/dev/null && echo "  $2 <- $1"; }
+
+if [ "$mode" = on ]; then
+    for p in "$SYS"/devices/system/cpu/cpu[0-9]*/cpufreq; do
+        put performance "$p/scaling_governor"
+        put performance "$p/energy_performance_preference"   # amd-pstate / intel_pstate
+        put 1 "$p/boost"
+    done
+    put 0 "$SYS/devices/system/cpu/intel_pstate/no_turbo"
+    put 1 "$SYS/devices/system/cpu/cpufreq/boost"
+    put performance "$SYS/firmware/acpi/platform_profile"
+    for g in "$SYS"/class/drm/card[0-9]/device; do               # AMD GPUs: highest clocks, always
+        [ "$(cat "$g/vendor" 2>/dev/null)" = 0x1002 ] && put high "$g/power_dpm_force_performance_level"
+    done
+    for g in "$SYS"/class/drm/card[0-9]; do                       # Intel GPUs: minimum clock raised to the maximum
+        [ "$(cat "$g/device/vendor" 2>/dev/null)" = 0x8086 ] || continue
+        [ -r "$g/gt_RP0_freq_mhz" ] && put "$(cat "$g/gt_RP0_freq_mhz")" "$g/gt_min_freq_mhz"
+    done
+    for h in "$SYS"/class/hwmon/hwmon*; do                        # motherboard + GPU fan headers
+        for pwm in "$h"/pwm[0-9]; do
+            [ -e "$pwm" ] || continue
+            put 1 "${pwm}_enable"                                  # 1 = manual
+            put "$(cat "${pwm}_max" 2>/dev/null || echo 255)" "$pwm"
+        done
+    done
+    if command -v nvidia-smi >/dev/null; then                      # NVIDIA: max power limit + top graphics clock
+        nvidia-smi -pm 1 >/dev/null 2>&1 && echo "  nvidia persistence on"
+        mp=$(nvidia-smi --query-gpu=power.max_limit --format=csv,noheader,nounits 2>/dev/null | head -1)
+        [ -n "$mp" ] && nvidia-smi -pl "${mp%.*}" >/dev/null 2>&1 && echo "  nvidia power limit <- ${mp%.*} W"
+        mc=$(nvidia-smi --query-supported-clocks=graphics --format=csv,noheader,nounits 2>/dev/null | sort -n | tail -1)
+        [ -n "$mc" ] && nvidia-smi -lgc "$mc,$mc" >/dev/null 2>&1 && echo "  nvidia graphics clock locked at $mc MHz"
+        # NVIDIA card fans: not settable from Wayland (nvidia-settings needs X), so they stay automatic
+    fi
+else
+    for p in "$SYS"/devices/system/cpu/cpu[0-9]*/cpufreq; do
+        gov=powersave; grep -qw schedutil "$p/scaling_available_governors" 2>/dev/null && ! [ -e "$p/energy_performance_preference" ] && gov=schedutil
+        put "$gov" "$p/scaling_governor"
+        put balance_performance "$p/energy_performance_preference"
+    done
+    if command -v nvidia-smi >/dev/null; then
+        nvidia-smi -rgc >/dev/null 2>&1
+        dp=$(nvidia-smi --query-gpu=power.default_limit --format=csv,noheader,nounits 2>/dev/null | head -1)
+        [ -n "$dp" ] && nvidia-smi -pl "${dp%.*}" >/dev/null 2>&1 && echo "  nvidia back to defaults"
+    fi
+    put balanced "$SYS/firmware/acpi/platform_profile"
+    for g in "$SYS"/class/drm/card[0-9]/device; do
+        [ "$(cat "$g/vendor" 2>/dev/null)" = 0x1002 ] && put auto "$g/power_dpm_force_performance_level"
+    done
+    for g in "$SYS"/class/drm/card[0-9]; do
+        [ "$(cat "$g/device/vendor" 2>/dev/null)" = 0x8086 ] || continue
+        [ -r "$g/gt_RPn_freq_mhz" ] && put "$(cat "$g/gt_RPn_freq_mhz")" "$g/gt_min_freq_mhz"
+    done
+    for h in "$SYS"/class/hwmon/hwmon*; do
+        for pwm in "$h"/pwm[0-9]; do [ -e "$pwm" ] && put 2 "${pwm}_enable"; done   # 2 = automatic
+    done
+fi
+exit 0

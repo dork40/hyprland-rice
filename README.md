@@ -2,7 +2,7 @@
 
 A complete, good-looking **Hyprland desktop you can install with one command**: a black, glassy, minimal setup with a bar, launcher, notifications, terminal, wallpapers and a handful of small apps that make it easy to live in. Works on **Arch, Fedora and Ubuntu/Debian**, with **NVIDIA support**.
 
-**This is the laptop edition.** Running a desktop PC? Switch to the `pc-edition` branch (`git checkout pc-edition`): no laptop bits, plus an optional max-performance service.
+**One installer for laptops and PCs, NVIDIA, AMD and Intel.** When you run it, it asks which computer you have (**laptop** or **PC**) and which graphics card (**NVIDIA**, **AMD**, **Intel**, or a hybrid like NVIDIA + AMD), suggests the right answer, and sets everything up for that choice.
 
 ### What you get
 
@@ -33,7 +33,7 @@ cd ~/hyprland-rice
 
 That block works the first time and every time after: it downloads the rice, or updates it if you already have it. The installer also updates itself to the latest version before it starts.
 
-The installer is all-in-one: there are no options to pick through. It checks every package one by one and **skips what you already have** (already running Hyprland but no wofi? It installs just wofi, and the rest). It also installs **SDDM** as your login screen and sets it to start Hyprland. It installs only what the rice itself uses: Hyprland and its helpers (hypridle, hyprpaper, hyprpicker), Waybar, wofi, dunst, kitty, swayosd, wlogout, thunar (files), clipboard history, screenshots and screen recording, media keys, the volume/network/Bluetooth applets, the starship prompt and the JetBrainsMono Nerd Font. It does not install anyone's personal apps.
+The installer asks two questions (laptop or PC, and which graphics card) and then does everything. There is nothing else to pick through. It checks every package one by one and **skips what you already have** (already running Hyprland but no wofi? It installs just wofi, and the rest). It also installs **SDDM** as your login screen and sets it to start Hyprland. It installs only what the rice itself uses: Hyprland and its helpers (hypridle, hyprpaper, hyprpicker), Waybar, wofi, dunst, kitty, swayosd, wlogout, thunar (files), clipboard history, screenshots and screen recording, media keys, the volume/network/Bluetooth applets, the starship prompt and the JetBrainsMono Nerd Font. It does not install anyone's personal apps.
 
 Existing configs are backed up to `~/.config-rice-backup-<date>` before anything is overwritten.
 
@@ -107,14 +107,30 @@ Anything the distro doesn't ship is listed at the end, so you know what to insta
 | `Super+F1` | Welcome window: how to open apps, move windows, change styles |
 | `Super+/` | Searchable cheat sheet of every shortcut |
 
-## NVIDIA
+## Laptop or PC
 
-`install.sh` detects an NVIDIA GPU by itself. If it finds one it installs the open driver (`nvidia-open-dkms` and friends, for GTX 16xx / RTX and newer), turns on kernel modesetting, and enables the suspend/resume services. Reboot once afterwards.
+The installer asks which one you have and suggests the answer by looking for a battery.
 
-- **NVIDIA only (desktop):** it also writes `~/.config/hypr/nvidia.lua` with the Wayland environment variables Hyprland needs.
-- **NVIDIA + AMD/Intel (hybrid laptop):** it leaves the environment alone so the integrated GPU keeps driving the screen. Run games on the NVIDIA GPU with `__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia <program>`.
-- The Waybar GPU module shows NVIDIA usage and temperature through `nvidia-smi`.
-- Older cards (GTX 10xx and before) need the AUR driver `nvidia-580xx-dkms` instead; install it by hand.
+- **Laptop:** adds a battery module in the bar, screen brightness keys and low-battery warnings (15% and 5%).
+- **PC:** adds an optional **max-performance mode** that is on by default if you accept it. A systemd service (`rice-max-performance`) sets this at every boot:
+  - CPU governor to `performance` with boost on
+  - AMD GPU clocks pinned high, Intel GPU minimum clock raised to its maximum, NVIDIA power limit raised to its maximum with the graphics clock locked at its top speed
+  - every motherboard and GPU PWM fan header at 100%
+
+Fans at 100% are loud on purpose. Boards or GPUs that don't expose PWM fan control are skipped, and NVIDIA graphics-card fans can't be set from Wayland, so they keep their automatic curve. Turn it off any time:
+
+```sh
+sudo systemctl disable --now rice-max-performance   # back to automatic fans and normal governors
+```
+
+For scripted installs, skip the questions with `RICE_EDITION=laptop|pc`, `RICE_GPU=nvidia|amd|intel|hybrid-amd|hybrid-intel|other` and `RICE_MAXPERF=0|1`.
+
+## Graphics cards
+
+- **NVIDIA:** installs the open NVIDIA driver, turns on kernel modesetting and the suspend/resume services (reboot once afterwards). On an NVIDIA-only machine it also writes `~/.config/hypr/nvidia.lua` with the Wayland settings Hyprland needs. Older cards (GTX 10xx and before) need the AUR driver `nvidia-580xx-dkms`; install it by hand. On Bazzite/Fedora Atomic the image already has the driver, so it is left alone.
+- **AMD and Intel:** installs the Mesa Vulkan and video-acceleration packages for your distro (skipped if you already have them).
+- **Hybrid (NVIDIA + AMD or Intel):** installs both sets and leaves the environment alone so the integrated GPU keeps driving the screen. Run a game on the NVIDIA GPU with `__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia <program>`.
+- The bar's GPU module shows usage and temperature for AMD and NVIDIA (Intel shows no usage figure).
 
 ## Notes
 

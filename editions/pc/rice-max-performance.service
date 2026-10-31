@@ -1,0 +1,12 @@
+[Unit]
+Description=Max performance: CPU/GPU full speed, fans 100%
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/rice-max-performance on
+ExecStop=/usr/local/bin/rice-max-performance off
+
+[Install]
+WantedBy=multi-user.target

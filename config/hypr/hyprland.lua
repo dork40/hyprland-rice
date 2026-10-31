@@ -47,7 +47,6 @@ hl.on("hyprland.start", function ()
   hl.exec_cmd("dunst")
   hl.exec_cmd("~/.config/rices/welcome.py --first-run")  -- one-time welcome window (reopen with Super+F1)
   hl.exec_cmd("udiskie --automount --notify --smart-tray")  -- USB drives mount by themselves
-  hl.exec_cmd("~/.config/hypr/scripts/battery-warn.sh")     -- low battery warnings at 15% and 5%
   hl.exec_cmd("/usr/lib/polkit-kde-authentication-agent-1")
   hl.exec_cmd("nm-applet --indicator")
   hl.exec_cmd("blueman-applet")  -- Bluetooth pairing prompts + tray icon (needed to pair controllers/earbuds)
@@ -240,10 +239,6 @@ hl.config({
         accel_profile = "flat", -- no mouse acceleration
         force_no_accel = false, -- flat profile above already means no accel; true ignores per-device sensitivity
 
-        touchpad = {
-            natural_scroll = false,
-            disable_while_typing = false, -- touchpad keeps working while keys are held (games)
-        },
     },
 })
 
@@ -317,26 +312,17 @@ hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true })
 hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 hl.bind(mainMod .. " + SHIFT + mouse:272", hl.dsp.window.resize(), { mouse = true })  -- Super+Shift+left-drag also resizes
 
--- Laptop multimedia keys for volume and LCD brightness
+-- Multimedia keys for volume
 hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("swayosd-client --output-volume raise"), { locked = true, repeating = true })
 hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("swayosd-client --output-volume lower"),      { locked = true, repeating = true })
 hl.bind("XF86AudioMute",        hl.dsp.exec_cmd("swayosd-client --output-volume mute-toggle"),     { locked = true, repeating = true })
 hl.bind("XF86AudioMicMute",     hl.dsp.exec_cmd("swayosd-client --input-volume mute-toggle"),   { locked = true, repeating = true })
-hl.bind("XF86MonBrightnessUp",  hl.dsp.exec_cmd("swayosd-client --brightness raise"),                  { locked = true, repeating = true })
-hl.bind("XF86MonBrightnessDown",hl.dsp.exec_cmd("swayosd-client --brightness lower"),                  { locked = true, repeating = true })
-
--- TUF A16: Fn+F7/Fn+F8 send the same code as plain F7/F8, so brightness lives on Super+F7/F8
-hl.bind(mainMod .. " + F7", hl.dsp.exec_cmd("swayosd-client --brightness lower"), { locked = true, repeating = true })
-hl.bind(mainMod .. " + F8", hl.dsp.exec_cmd("swayosd-client --brightness raise"), { locked = true, repeating = true })
 
 -- Requires playerctl
 hl.bind("XF86AudioNext",  hl.dsp.exec_cmd("playerctl next"),       { locked = true })
 hl.bind("XF86AudioPause", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
 hl.bind("XF86AudioPlay",  hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
 hl.bind("XF86AudioPrev",  hl.dsp.exec_cmd("playerctl previous"),   { locked = true })
-
-hl.bind("XF86Launch2", hl.dsp.exec_cmd("rog-control-center"))
-hl.bind("XF86Launch3", hl.dsp.exec_cmd("rog-control-center"))
 
 -- Wallpaper picker
 hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("~/.config/hypr/scripts/wallpaper.sh"))
@@ -464,6 +450,9 @@ hl.layer_rule({
     blur  = true,
     ignore_alpha = 0,
 })
+
+-- Laptop extras (brightness keys, battery warnings): written by install.sh only on the laptop edition
+pcall(dofile, os.getenv("HOME") .. "/.config/hypr/laptop.lua")
 
 -- NVIDIA environment (written by install.sh only on machines where NVIDIA drives the display)
 pcall(dofile, os.getenv("HOME") .. "/.config/hypr/nvidia.lua")

@@ -6,7 +6,7 @@
 conf=~/.config/hypr/hypridle.conf
 mins=$(( $(sed -n 's/^ *timeout = \([0-9]*\).*/\1/p' "$conf") / 60 ))
 
-# "Off" still runs hypridle with a sleep-only config so closing the lid always locks
+# "Off" still runs hypridle with a sleep-only config so going to sleep always locks
 refresh() { pkill -RTMIN+10 waybar; }
 active()  { pgrep -x hypridle >/dev/null && ! pgrep -f 'hypridle -c .*sleeponly' >/dev/null; }
 stop()    { pkill -x hypridle; while pgrep -x hypridle >/dev/null; do sleep 0.1; done; }

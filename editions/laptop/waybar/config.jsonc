@@ -1,0 +1,182 @@
+{
+  "layer": "top",
+  "position": "top",
+  "height": 42,
+  "spacing": 4,
+  "margin-top": 8,
+  "margin-left": 10,
+  "margin-right": 10,
+  "modules-left": [
+    "hyprland/workspaces",
+    "custom/weather",
+    "cpu",
+    "memory",
+    "custom/temp",
+    "custom/gpu",
+    "hyprland/window"
+  ],
+  "modules-center": [
+    "clock"
+  ],
+  "modules-right": [
+    "custom/screenshot",
+    "custom/notification",
+    "custom/idle",
+    "bluetooth",
+    "network",
+    "pulseaudio",
+    "battery",
+    "tray",
+    "custom/power"
+  ],
+  "hyprland/workspaces": {
+    "format": "{name}",
+    "on-click": "activate",
+    "on-scroll-up": "hyprctl dispatch workspace e-1",
+    "on-scroll-down": "hyprctl dispatch workspace e+1",
+    "all-outputs": true,
+    "sort-by-number": true
+  },
+  "clock": {
+    "format": "󰥔  {:%I:%M %p    %a %d %b}",
+    "tooltip": true,
+    "format-alt": "{:%A, %B %d, %Y}"
+  },
+  "network": {
+    "format-wifi": "󰤨  {essid}",
+    "format-ethernet": "󰈀  Ethernet",
+    "format-disconnected": "󰤭  Offline",
+    "tooltip": true
+  },
+  "pulseaudio": {
+    "format": "{icon} {volume}%",
+    "format-muted": "󰝟 Muted",
+    "format-icons": {
+      "default": [
+        "󰕿",
+        "󰖀",
+        "󰕾"
+      ]
+    },
+    "on-click": "pavucontrol",
+    "scroll-step": 5
+  },
+  "battery": {
+    "states": {
+      "warning": 30,
+      "critical": 15
+    },
+    "format": "{icon} {capacity}%",
+    "format-charging": "󰂄 {capacity}%",
+    "format-plugged": "󰚥 {capacity}%",
+    "format-icons": [
+      "󰂎",
+      "󰁺",
+      "󰁻",
+      "󰁼",
+      "󰁽",
+      "󰁾",
+      "󰂀",
+      "󰂁",
+      "󰂂",
+      "󰁹"
+    ],
+    "tooltip-format": "{timeTo}"
+  },
+  "mpris": {
+    "format": "{status_icon}  {dynamic}",
+    "dynamic-order": [
+      "title",
+      "artist"
+    ],
+    "dynamic-len": 22,
+    "status-icons": {
+      "playing": "󰏤",
+      "paused": "󰐊",
+      "stopped": "󰓛"
+    },
+    "on-click": "playerctl play-pause",
+    "on-click-right": "playerctl next",
+    "on-scroll-up": "playerctl previous",
+    "tooltip-format": "{player}: {title} - {artist}"
+  },
+  "cpu": {
+    "format": "󰻠 {usage}%",
+    "interval": 3,
+    "on-click": "kitty --title btop btop-fit"
+  },
+  "memory": {
+    "format": "󰍛 {percentage}%",
+    "interval": 5,
+    "tooltip-format": "{used:0.1f} / {total:0.1f} GiB used",
+    "on-click": "kitty --title btop btop-fit"
+  },
+  "hyprland/window": {
+    "format": "{title}",
+    "max-length": 12,
+    "separate-outputs": true,
+    "rewrite": {
+      "": ""
+    }
+  },
+  "custom/gpu": {
+    "exec": "~/.config/hypr/scripts/gpu.sh",
+    "return-type": "json",
+    "interval": 3,
+    "on-click": "kitty --title btop btop-fit"
+  },
+  "custom/temp": {
+    "exec": "~/.config/hypr/scripts/temp.sh",
+    "return-type": "json",
+    "interval": 5,
+    "signal": 12,
+    "on-click": "kitty --title btop btop-fit",
+    "on-click-right": "~/.config/hypr/scripts/temp.sh unit"
+  },
+  "bluetooth": {
+    "format": "󰂯",
+    "format-off": "󰂲",
+    "format-connected": "󰂱 {num_connections}",
+    "tooltip-format-connected": "{device_enumerate}",
+    "tooltip-format-enumerate-connected": "{device_alias}",
+    "on-click": "blueman-manager"
+  },
+  "custom/screenshot": {
+    "exec": "~/.config/hypr/scripts/record.sh",
+    "return-type": "json",
+    "interval": "once",
+    "signal": 15,
+    "on-click": "~/.config/hypr/scripts/screenshot.sh region",
+    "on-click-right": "~/.config/hypr/scripts/record.sh toggle"
+  },
+  "custom/idle": {
+    "exec": "~/.config/hypr/scripts/idle.sh",
+    "return-type": "json",
+    "interval": 30,
+    "signal": 10,
+    "on-click": "~/.config/hypr/scripts/idle.sh toggle",
+    "on-click-right": "~/.config/hypr/scripts/idle.sh pick"
+  },
+  "custom/weather": {
+    "exec": "~/.config/hypr/scripts/weather.sh",
+    "return-type": "json",
+    "interval": 900,
+    "on-click": "kitty --title Weather bash -c 'curl -s \"wttr.in/${WEATHER_LOCATION:-}?u&F\"; read -n1 -rsp \"Press any key to close\"'"
+  },
+  "custom/notification": {
+    "exec": "~/.config/hypr/scripts/notif-status.sh",
+    "return-type": "json",
+    "interval": "once",
+    "signal": 8,
+    "on-click": "~/.config/hypr/scripts/notif-toggle.sh"
+  },
+  "custom/power": {
+    "format": "⏻",
+    "tooltip": false,
+    "on-click": "wlogout -b 6 -T 400 -B 400"
+  },
+  "tray": {
+    "icon-size": 16,
+    "spacing": 18
+  }
+}

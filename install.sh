@@ -1,21 +1,18 @@
 #!/usr/bin/env bash
 # Installs this Hyprland rice: every dependency, the configs, scripts, wallpapers and the Wardrobe style switcher.
 # Works on Arch (and Arch-based), Fedora and Ubuntu/Debian. You get the whole rice.
-#   ./install.sh
-#   ./install.sh --no-max-performance   (PC edition only) skip the max CPU/GPU/fan service
+#   ./install.sh    asks which edition (laptop / PC) and which graphics card (NVIDIA / AMD / Intel), then installs everything
+# For scripted installs: RICE_EDITION=laptop|pc  RICE_GPU=nvidia|amd|intel|hybrid-amd|hybrid-intel|other  RICE_MAXPERF=0|1
 set -euo pipefail
 
-EDITION=laptop   # laptop | pc  (the pc-edition branch sets this to pc)
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 CFG=${XDG_CONFIG_HOME:-$HOME/.config}
 BACKUP=$HOME/.config-rice-backup-$(date +%Y%m%d-%H%M%S)
-MAXPERF=1
 for a in "$@"; do
     case $a in
-        --no-max-performance) MAXPERF=0 ;;
-        -h|--help) sed -n '2,6p' "$0"; exit 0 ;;
-        *) echo "unknown option: $a"; exit 1 ;;
+        -h|--help) sed -n '2,5p' "$0"; exit 0 ;;
+        *) echo "unknown option: $a (just run ./install.sh)"; exit 1 ;;
     esac
 done
 # Make sure this copy is the latest: if it is a git clone with no local edits, pull and restart with the new installer.
@@ -43,6 +40,71 @@ if [[ -n ${RICE_DISTRO:-} ]]; then DISTRO=$RICE_DISTRO; else
         *) DISTRO=unknown ;;
     esac
 fi
+
+
+# ---- your choices: edition and graphics card --------------------------------------------
+gpus=${RICE_LSPCI:-$(lspci -nn 2>/dev/null | grep -Ei 'vga|3d|display' || true)}
+det_nv=0; det_amd=0; det_intel=0
+grep -qi nvidia <<<"$gpus" && det_nv=1
+grep -Eqi '\b(amd|ati)\b' <<<"$gpus" && det_amd=1
+grep -qi intel <<<"$gpus" && det_intel=1
+if   ((det_nv && det_amd));   then det_gpu=hybrid-amd
+elif ((det_nv && det_intel)); then det_gpu=hybrid-intel
+elif ((det_nv));              then det_gpu=nvidia
+elif ((det_amd));             then det_gpu=amd
+elif ((det_intel));           then det_gpu=intel
+else det_gpu=other; fi
+if ls /sys/class/power_supply/BAT* >/dev/null 2>&1; then det_edition=laptop; else det_edition=pc; fi
+
+CHOICE=""
+choose() {  # choose "Question" default key1 "Label 1" key2 "Label 2" ...   -> sets CHOICE
+    local q=$1 def=$2; shift 2
+    local keys=() labels=() i n
+    while (($#)); do keys+=("$1"); labels+=("$2"); shift 2; done
+    CHOICE=$def
+    [[ -r /dev/tty && -w /dev/tty ]] || return 0      # no keyboard (scripted install): use the detected default
+    { echo; printf '\033[1m%s\033[0m\n' "$q"
+      for i in "${!keys[@]}"; do
+          printf '  %d) %s%s\n' $((i + 1)) "${labels[i]}" "$([[ ${keys[i]} == "$def" ]] && echo '   (suggested)')"
+      done; } >/dev/tty
+    read -r -p "Type a number and press Enter (just Enter = the suggested choice): " n </dev/tty || return 0
+    if [[ $n =~ ^[0-9]+$ ]] && ((n >= 1 && n <= ${#keys[@]})); then CHOICE=${keys[n - 1]}; fi
+}
+
+EDITION=${RICE_EDITION:-}
+if [[ $EDITION != laptop && $EDITION != pc ]]; then
+    choose "Which computer is this?" "$det_edition" \
+        laptop "Laptop   (battery, brightness keys, low-battery warnings)" \
+        pc     "PC / desktop   (optional max-performance mode)"
+    EDITION=$CHOICE
+fi
+GPU=${RICE_GPU:-}
+case $GPU in nvidia|amd|intel|hybrid-amd|hybrid-intel|other) ;; *)
+    choose "Which graphics card do you have?" "$det_gpu" \
+        nvidia       "NVIDIA" \
+        amd          "AMD" \
+        intel        "Intel" \
+        hybrid-amd   "NVIDIA + AMD   (hybrid laptop)" \
+        hybrid-intel "NVIDIA + Intel   (hybrid laptop)" \
+        other        "Something else / virtual machine   (skip graphics drivers)"
+    GPU=$CHOICE ;;
+esac
+MAXPERF=0
+if [[ $EDITION == pc ]]; then
+    MAXPERF=${RICE_MAXPERF:-}
+    if [[ $MAXPERF != 0 && $MAXPERF != 1 ]]; then
+        choose "Turn on max-performance mode? (CPU/GPU at full speed, fans at 100%, starts at every boot; loud)" yes \
+            yes "Yes" no "No"
+        [[ $CHOICE == yes ]] && MAXPERF=1 || MAXPERF=0
+    fi
+fi
+HAS_NVIDIA=0; HAS_OTHER=0
+case $GPU in
+    nvidia) HAS_NVIDIA=1 ;;
+    hybrid-amd|hybrid-intel) HAS_NVIDIA=1; HAS_OTHER=1 ;;
+    amd|intel) HAS_OTHER=1 ;;
+esac
+say "Installing the $EDITION edition, graphics: $GPU"
 
 # Immutable Fedora (Bazzite, Silverblue, Kinoite, Aurora): dnf is blocked, packages are layered with rpm-ostree
 ATOMIC=0
@@ -75,12 +137,17 @@ debian)
 *)  PKGS=(); AUR=(); NVIDIA=() ;;
 esac
 [[ $EDITION == laptop ]] && PKGS+=(brightnessctl)
-
-# ---- GPU detection ------------------------------------------------------------------
-gpus=${RICE_LSPCI:-$(lspci -nn 2>/dev/null | grep -Ei 'vga|3d|display' || true)}
-HAS_NVIDIA=0; HAS_OTHER=0
-grep -qi nvidia <<<"$gpus" && HAS_NVIDIA=1
-grep -Eqi '\b(amd|ati)\b|intel' <<<"$gpus" && HAS_OTHER=1
+# graphics user-space (Vulkan/video acceleration); NVIDIA's own driver is handled in its own step below
+if ((ATOMIC)); then :   # immutable images already include their graphics stack
+else
+    case $DISTRO:$GPU in
+        arch:amd|arch:hybrid-amd)       PKGS+=(mesa vulkan-radeon libva-mesa-driver) ;;
+        arch:intel|arch:hybrid-intel)   PKGS+=(mesa vulkan-intel intel-media-driver) ;;
+        fedora:amd|fedora:hybrid-amd|fedora:intel|fedora:hybrid-intel) PKGS+=(mesa-dri-drivers mesa-vulkan-drivers) ;;
+        debian:amd|debian:hybrid-amd)   PKGS+=(mesa-vulkan-drivers libgl1-mesa-dri) ;;
+        debian:intel|debian:hybrid-intel) PKGS+=(mesa-vulkan-drivers libgl1-mesa-dri intel-media-va-driver) ;;
+    esac
+fi
 
 MISSING=(); SKIPPED=()
 # package -> the command it provides, so a hand-built or differently packaged tool also counts as "already there"
@@ -244,6 +311,11 @@ done
 say "Copying configs to $CFG"
 mkdir -p "$CFG"
 for d in "$HERE"/config/*; do cp -a "$d" "$CFG/"; done
+if [[ $EDITION == laptop ]]; then
+    say "Adding the laptop extras (battery module, brightness keys, low-battery warnings)"
+    cp -a "$HERE"/editions/laptop/. "$CFG/"
+    printf 'Brightness keys            Screen brightness (laptop)\n' >>"$CFG/hypr/keybinds.txt"
+fi
 chmod +x "$CFG"/hypr/scripts/* "$CFG"/rices/*.py 2>/dev/null || true
 
 if ((HAS_NVIDIA)); then
@@ -283,8 +355,8 @@ cp -an "$HERE"/wallpapers/. "$HOME/Pictures/wallpapers/"
 
 if [[ $EDITION == pc ]] && ((MAXPERF)); then
     say "Installing the max-performance service (CPU/GPU full speed, fans 100%, starts at every boot)"
-    sudo install -m 755 "$HERE/pc/rice-max-performance" /usr/local/bin/rice-max-performance
-    sudo install -m 644 "$HERE/pc/rice-max-performance.service" /etc/systemd/system/rice-max-performance.service
+    sudo install -m 755 "$HERE/editions/pc/rice-max-performance" /usr/local/bin/rice-max-performance
+    sudo install -m 644 "$HERE/editions/pc/rice-max-performance.service" /etc/systemd/system/rice-max-performance.service
     sudo systemctl daemon-reload
     sudo systemctl enable --now rice-max-performance.service
 fi
