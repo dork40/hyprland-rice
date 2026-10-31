@@ -32,6 +32,10 @@ if [[ -n ${RICE_DISTRO:-} ]]; then DISTRO=$RICE_DISTRO; else
     esac
 fi
 
+# Immutable Fedora (Bazzite, Silverblue, Kinoite, Aurora): dnf is blocked, packages are layered with rpm-ostree
+ATOMIC=0
+[[ $DISTRO == fedora && ( -e /run/ostree-booted || -n ${RICE_ATOMIC:-} ) ]] && ATOMIC=1
+
 # ---- package lists: only what the rice itself uses --------------------------------
 case $DISTRO in
 arch)
@@ -86,14 +90,23 @@ have() { installed_pkg "$1" || { [[ -n ${CMD_OF[$1]:-} ]] && command -v "${CMD_O
 has_pkg() {  # is this package available from the distro's repos?
     case $DISTRO in
         arch)   pacman -Si "$1" &>/dev/null ;;
-        fedora) dnf -q info "$1" &>/dev/null ;;
+        fedora) ((ATOMIC)) && return 0   # rpm-ostree can't be queried cheaply: pkg_install reports what failed
+                dnf -q info "$1" &>/dev/null ;;
         debian) [[ -n $(apt-cache policy "$1" 2>/dev/null | sed -n 's/^ *Candidate: //p' | grep -v '(none)') ]] ;;
     esac
 }
 pkg_install() {
     case $DISTRO in
         arch)   sudo pacman -S --needed --noconfirm "$@" ;;
-        fedora) sudo dnf install -y "$@" ;;
+        fedora)
+            if ((ATOMIC)); then
+                # one transaction; if any package is unavailable, retry one by one and report the ones that failed
+                sudo rpm-ostree install --idempotent --allow-inactive "$@" && return 0
+                echo "  One of the packages wasn't available, trying them one at a time..."
+                for p in "$@"; do sudo rpm-ostree install --idempotent --allow-inactive "$p" || MISSING+=("$p"); done
+            else
+                sudo dnf install -y "$@"
+            fi ;;
         debian) sudo apt-get install -y "$@" ;;
     esac
 }
@@ -123,14 +136,22 @@ else
     say "Detected distro: $DISTRO"
     case $DISTRO in
         fedora)
-            say "Enabling the Hyprland COPR (Fedora's own Hyprland is too old for this config)"
-            sudo dnf install -y dnf-plugins-core
-            sudo dnf copr enable -y solopasha/hyprland ;;
+            if ((ATOMIC)); then
+                say "Immutable Fedora (Bazzite/Silverblue/Kinoite) found: adding the Hyprland COPR and layering packages with rpm-ostree"
+                ver=$(. /etc/os-release; echo "${VERSION_ID:-$(rpm -E %fedora 2>/dev/null)}")
+                sudo curl -fsSL -o /etc/yum.repos.d/solopasha-hyprland.repo \
+                    "https://copr.fedorainfracloud.org/coprs/solopasha/hyprland/repo/fedora-$ver/solopasha-hyprland-fedora-$ver.repo"
+            else
+                say "Enabling the Hyprland COPR (Fedora's own Hyprland is too old for this config)"
+                sudo dnf install -y dnf-plugins-core
+                sudo dnf copr enable -y solopasha/hyprland
+            fi ;;
         debian) sudo apt-get update ;;
     esac
     say "Installing packages (anything your distro doesn't ship is listed at the end)"
     want=()
     for p in "${PKGS[@]}"; do
+        if ((ATOMIC)) && [[ $p == sddm ]]; then continue; fi   # the image already has its own login screen
         if have "$p"; then SKIPPED+=("$p")
         elif has_pkg "$p"; then want+=("$p")
         else MISSING+=("$p"); fi
@@ -170,10 +191,17 @@ setup_sddm() {
         echo "  SDDM will start at the next boot with Hyprland preselected."
     fi
 }
-[[ $DISTRO != unknown ]] && setup_sddm
+if ((ATOMIC)); then
+    echo "Immutable Fedora: leaving your login screen alone. Pick Hyprland from the session menu at login (after the reboot)."
+elif [[ $DISTRO != unknown ]]; then
+    setup_sddm
+fi
 
 # ---- NVIDIA ----------------------------------------------------------------------------
-if ((HAS_NVIDIA)) && [[ $DISTRO != unknown ]]; then
+if ((HAS_NVIDIA)) && ((ATOMIC)); then
+    say "NVIDIA GPU found"
+    echo "  Bazzite/Fedora Atomic NVIDIA images already include the driver, so I'm not touching it."
+elif ((HAS_NVIDIA)) && [[ $DISTRO != unknown ]]; then
     say "NVIDIA GPU found: installing the driver"
     case $DISTRO in
         arch)
@@ -255,11 +283,14 @@ say "Generating the default style (noir)"
 # ---- report ------------------------------------------------------------------------------
 say "Dependency check"
 absent=()
+if ((ATOMIC)); then
+    echo "  Layered packages (Hyprland, Waybar, ...) are applied by rpm-ostree on the next boot, so they can't be checked yet."
+fi
 for c in Hyprland hyprctl waybar wofi dunst kitty swayosd-client hypridle hyprpaper wlogout starship awww cliphist \
          wl-copy grim slurp hyprpicker wf-recorder playerctl thunar sddm python3 ffmpeg curl notify-send; do
     command -v "$c" >/dev/null 2>&1 || [[ -x $HOME/.local/bin/$c ]] || absent+=("$c")
 done
-if ((${#absent[@]})); then
+if ((${#absent[@]})) && ! ((ATOMIC)); then
     echo "  Not found on this system: ${absent[*]}"
     echo "  (awww sets the wallpaper: https://codeberg.org/LGFae/awww . Install anything missing from your distro or by hand.)"
 fi
@@ -270,7 +301,7 @@ fi
 
 cat <<MSG
 
-Done. Reboot, then log in from the SDDM screen (Hyprland is preselected).
+Done. Reboot, then pick the Hyprland session on the login screen.
   Super+Shift+R   switch rice style (Wardrobe)       Super+W   wallpapers
   Super+Shift+D   displays                           Super+F1  welcome / how to use it
   Super+/         cheat sheet of every shortcut
