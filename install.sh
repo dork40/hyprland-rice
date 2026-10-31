@@ -203,18 +203,15 @@ fix_xwayland() {
     [[ $ans =~ ^[Nn] ]] && return 1
     sudo rpm-ostree override remove "$cur" --install xorg-x11-server-Xwayland
 }
-# rpm-ostree runs one job at a time. If an earlier run is still going, wait for it (or offer to cancel it).
+# rpm-ostree runs one job at a time. If one is already running (maybe an earlier run of this installer), offer to cancel it.
 rpmostree_wait() {
-    local i ans=y
-    for ((i = 1; i <= 60; i++)); do
-        rpm-ostree status 2>/dev/null | grep -qiE '^ *(State: busy|Transaction:)' || return 0
-        ((i == 1)) && echo "  Another rpm-ostree job is still running (maybe an earlier run of this installer). Waiting for it to finish..."
-        sleep 5
-    done
-    echo "  It is still busy after 5 minutes."
-    [[ -r /dev/tty ]] && { read -r -p "  Cancel that job and continue? [Y/n] " ans </dev/tty || ans=y; }
-    if [[ $ans =~ ^[Nn] ]]; then echo "  Stopping. When ready: sudo rpm-ostree cancel, then run ./install.sh again."; exit 1; fi
-    sudo rpm-ostree cancel || true; sleep 2
+    rpm-ostree status 2>/dev/null | grep -qiE '^ *(State: busy|Transaction:)' || return 0
+    local ans=y
+    echo "  Another rpm-ostree job is already running (maybe an earlier run of this installer)."
+    [[ -r /dev/tty ]] && { read -r -p "  Cancel it and continue? [Y/n] " ans </dev/tty || ans=y; }
+    if [[ $ans =~ ^[Nn] ]]; then echo "  OK. Let it finish (or run: sudo rpm-ostree cancel), then run ./install.sh again."; exit 1; fi
+    sudo rpm-ostree cancel || true
+    sleep 2
 }
 # Layer packages with rpm-ostree: drop the ones Fedora doesn't have, then fall back to one at a time for conflicts.
 atomic_install() {
