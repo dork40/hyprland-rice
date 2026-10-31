@@ -199,19 +199,27 @@ installed_pkg() { [[ -n ${INST[$1]:-} ]]; }
 have() { installed_pkg "$1" || { [[ -n ${CMD_OF[$1]:-} ]] && command -v "${CMD_OF[$1]}" >/dev/null 2>&1; }; }
 has_pkg() { ((ATOMIC)) && return 0; [[ -n ${AVAIL[$1]:-} ]]; }   # atomic: pkg_install reports what failed
 # Immutable Fedora: Bazzite ships its own (Terra) Xwayland, which conflicts with the one Hyprland's package asks for.
-XWL_TRIED=0; XWL_PENDING=0; DEFERRED=()
+XWL_TRIED=0; XWL_PENDING=0; XWL_MODE=""; DEFERRED=()
 fix_xwayland() {
     ((XWL_TRIED)) && return 1; XWL_TRIED=1
     local cur; cur=$(rpm -qa 2>/dev/null | grep -i 'xorg-x11-server-Xwayland' | grep -vi '^xorg-x11-server-Xwayland-[0-9]' | head -1)
     [[ -z $cur ]] && return 1
     cur=${cur%%-[0-9]*}
     echo "  This system ships its own Xwayland ($cur), which conflicts with the one Hyprland's package asks for."
-    echo "  The swap is staged now and applied at the next reboot; Hyprland itself installs when you run this installer a second time."
-    echo "  (Your current system stays bootable: if anything looks wrong, pick the previous entry in the boot menu or run: rpm-ostree rollback)"
+    echo "  The swap is applied at the next reboot. Your current system stays bootable: if anything looks wrong,"
+    echo "  pick the previous entry in the boot menu or run: rpm-ostree rollback"
     local ans=y
-    if [[ -r /dev/tty ]]; then read -r -p "  Swap it for Fedora's Xwayland so Hyprland can install? (older version, fine for Hyprland) [Y/n] " ans </dev/tty || ans=y; fi
+    if [[ -r /dev/tty ]]; then read -r -p "  Swap it for Fedora's Xwayland (older version, fine for Hyprland) and install Hyprland? [Y/n] " ans </dev/tty || ans=y; fi
     [[ $ans =~ ^[Nn] ]] && return 1
-    sudo rpm-ostree override remove "$cur" --install xorg-x11-server-Xwayland
+    rpmostree_wait
+    # one transaction: remove Terra's Xwayland, add Fedora's, add Hyprland (a later transaction can't see the swap before a reboot)
+    if sudo rpm-ostree override remove "$cur" --install xorg-x11-server-Xwayland --install hyprland --install xdg-desktop-portal-hyprland; then
+        XWL_MODE=combined; return 0
+    fi
+    echo "  That didn't work in one step; staging just the swap, Hyprland will install on the next run."
+    rpmostree_wait
+    if sudo rpm-ostree override remove "$cur" --install xorg-x11-server-Xwayland; then XWL_MODE=swap; return 0; fi
+    return 1
 }
 # rpm-ostree runs one job at a time. If one is already running (maybe an earlier run of this installer), offer to cancel it.
 rpmostree_wait() {
@@ -232,7 +240,7 @@ swap_pending() {
 atomic_install() {
     local list=("$@") tmp rc nf p keep attempt
     tmp=$(mktemp)
-    if swap_pending; then   # a previous run already staged the swap: hold Hyprland back right away instead of failing on it again
+    if swap_pending && ! rpm-ostree status 2>/dev/null | grep -qE '(^|[[:space:]])hyprland($|[[:space:]])'; then   # swap queued but Hyprland not: hold it back instead of failing again
         XWL_PENDING=1; keep=()
         for p in "${list[@]}"; do
             case $p in hyprland|xdg-desktop-portal-hyprland) DEFERRED+=("$p") ;; *) keep+=("$p") ;; esac
@@ -247,10 +255,12 @@ atomic_install() {
         nf=$(sed -n 's/.*Packages not found: //p' "$tmp" | head -1)
         if [[ -z $nf ]]; then
             if grep -qi 'xwayland' "$tmp" && fix_xwayland; then
-                # the swap only takes effect after a reboot, so Hyprland can't be layered yet: hold it back and do the rest now
                 XWL_PENDING=1; keep=()
                 for p in "${list[@]}"; do
-                    case $p in hyprland|xdg-desktop-portal-hyprland) DEFERRED+=("$p") ;; *) keep+=("$p") ;; esac
+                    case $p in
+                        hyprland|xdg-desktop-portal-hyprland) [[ $XWL_MODE == combined ]] || DEFERRED+=("$p") ;;   # already queued, or held back for the next run
+                        *) keep+=("$p") ;;
+                    esac
                 done
                 list=("${keep[@]}"); ((${#list[@]})) || { rm -f "$tmp"; return 0; }
                 continue
@@ -377,6 +387,10 @@ fi
 # ---- SDDM: the login screen, set to start Hyprland ----------------------------------------
 # The login screen remembers the last session; make that Hyprland (also on immutable Fedora/Bazzite, where SDDM already exists)
 preselect_hyprland_session() {
+    if [[ -e /usr/lib/systemd/system/plasmalogin.service || -e /etc/systemd/system/plasmalogin.service ]]; then
+        echo "  Your login screen is Plasma Login Manager: choose Hyprland from its session menu (it is not preselected)."
+        return 0
+    fi
     command -v sddm >/dev/null || [[ -d /var/lib/sddm ]] || return 0
     sudo mkdir -p /var/lib/sddm
     printf '[Last]\nSession=/usr/share/wayland-sessions/hyprland.desktop\nUser=%s\n' "${SUDO_USER:-$USER}" | sudo tee /var/lib/sddm/state.conf >/dev/null
@@ -495,7 +509,10 @@ verify_hyprland() {
     if [[ -e /usr/share/wayland-sessions/hyprland.desktop ]] && command -v Hyprland >/dev/null; then
         echo "  OK: Hyprland is installed and its login session exists."; return 0
     fi
-    if ((ATOMIC)) && rpm-ostree status 2>/dev/null | grep -qi 'hyprland'; then
+    if [[ $XWL_MODE == combined ]]; then
+        echo "  Hyprland and the Xwayland swap are queued together. Reboot to get both; Hyprland will then be in the login screen's session menu."; return 0
+    fi
+    if ((ATOMIC)) && rpm-ostree status 2>/dev/null | grep -qE '(^|[[:space:]])hyprland($|[[:space:]])'; then
         echo "  Hyprland is queued in the next boot image. Reboot to get it; it will then appear in the login screen's session menu."; return 0
     fi
     echo "  Hyprland is NOT installed yet, so the login screen can't offer it."
@@ -524,6 +541,15 @@ if command -v Hyprland >/dev/null && ! printf '0.56\n%s\n' "$(Hyprland --version
 fi
 
 verify_hyprland
+if ((XWL_PENDING)) && [[ $XWL_MODE == combined ]]; then
+cat <<MSG
+
+Almost done. Reboot now: the Xwayland swap and Hyprland are installed together and both switch on at the next boot.
+At the login screen choose the Hyprland session (click the session label, usually bottom-left, and pick Hyprland).
+No session menu? Press Ctrl+Alt+F3, log in, and type: Hyprland
+MSG
+exit 0
+fi
 if ((XWL_PENDING)); then
 cat <<MSG
 
