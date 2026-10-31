@@ -106,6 +106,11 @@ case $GPU in
 esac
 say "Installing the $EDITION edition, graphics: $GPU"
 
+# Ask for the password once up front and keep it alive in the background (long installs never stall on a prompt)
+if [[ $DISTRO != unknown ]] && command -v sudo >/dev/null; then
+    sudo -v && { while kill -0 $$ 2>/dev/null; do sudo -n true 2>/dev/null; sleep 40; done >/dev/null 2>&1 & }
+fi
+
 # Immutable Fedora (Bazzite, Silverblue, Kinoite, Aurora): dnf is blocked, packages are layered with rpm-ostree
 ATOMIC=0
 [[ $DISTRO == fedora && ( -e /run/ostree-booted || -n ${RICE_ATOMIC:-} ) ]] && ATOMIC=1
@@ -116,8 +121,8 @@ arch)
     PKGS=(hyprland waybar wofi dunst kitty swayosd hypridle hyprpaper wlogout starship ttf-jetbrains-mono-nerd
           python python-gobject gtk4 gtk4-layer-shell ffmpeg curl libnotify xdg-desktop-portal-hyprland thunar sddm
           cliphist wl-clipboard grim slurp hyprpicker wf-recorder playerctl tesseract tesseract-data-eng btop udiskie
-          network-manager-applet blueman polkit-kde-agent pavucontrol papirus-icon-theme breeze)
-    AUR=(awww rofimoji)
+          network-manager-applet blueman polkit-kde-agent pavucontrol papirus-icon-theme breeze awww rofimoji)
+    AUR=()   # anything missing from the repos (wlogout, for example) is tried in the AUR automatically
     NVIDIA=(nvidia-open-dkms nvidia-utils lib32-nvidia-utils nvidia-settings libva-nvidia-driver egl-wayland linux-headers) ;;
 fedora)
     PKGS=(hyprland waybar wofi dunst kitty swayosd hypridle hyprpaper wlogout python3 python3-gobject gtk4
@@ -141,7 +146,7 @@ esac
 if ((ATOMIC)); then :   # immutable images already include their graphics stack
 else
     case $DISTRO:$GPU in
-        arch:amd|arch:hybrid-amd)       PKGS+=(mesa vulkan-radeon libva-mesa-driver) ;;
+        arch:amd|arch:hybrid-amd)       PKGS+=(mesa vulkan-radeon) ;;
         arch:intel|arch:hybrid-intel)   PKGS+=(mesa vulkan-intel intel-media-driver) ;;
         fedora:amd|fedora:hybrid-amd|fedora:intel|fedora:hybrid-intel) PKGS+=(mesa-dri-drivers mesa-vulkan-drivers) ;;
         debian:amd|debian:hybrid-amd)   PKGS+=(mesa-vulkan-drivers libgl1-mesa-dri) ;;
@@ -171,23 +176,28 @@ declare -A CMD_OF=([hyprland]=Hyprland [waybar]=waybar [wofi]=wofi [dunst]=dunst
     [btop]=btop [udiskie]=udiskie [network-manager-applet]=nm-applet [network-manager-gnome]=nm-applet [blueman]=blueman-manager
     [pavucontrol]=pavucontrol [rofimoji]=rofimoji [awww]=awww [sddm]=sddm [brightnessctl]=brightnessctl [tesseract]=tesseract
     [tesseract-ocr]=tesseract [curl]=curl [ffmpeg]=ffmpeg [ffmpeg-free]=ffmpeg)
-installed_pkg() {
+# One query per distro for everything we need to know (was one slow query per package)
+declare -A INST AVAIL
+load_state() {
+    local n names; names=$(printf '%s\n' "${PKGS[@]}" "${AUR[@]}")
+    # (only the ~45 names we care about are kept: the package lists have tens of thousands of entries)
     case $DISTRO in
-        arch)   pacman -Qq "$1" &>/dev/null ;;
-        fedora) rpm -q "$1" &>/dev/null ;;
-        debian) dpkg -s "$1" &>/dev/null ;;
-        *) return 1 ;;
+        arch)
+            while read -r n; do INST[$n]=1; done < <(pacman -Qq 2>/dev/null | grep -Fx -f <(echo "$names"))
+            while read -r n; do AVAIL[$n]=1; done < <(pacman -Slq 2>/dev/null | grep -Fx -f <(echo "$names")) ;;
+        fedora)
+            while read -r n; do INST[$n]=1; done < <(rpm -qa --qf '%{NAME}\n' 2>/dev/null | grep -Fx -f <(echo "$names"))
+            if ((! ATOMIC)); then   # rpm-ostree can't be queried: layering reports what is missing
+                while read -r n; do AVAIL[$n]=1; done < <(dnf -q repoquery --available --qf '%{name}\n' "${PKGS[@]}" 2>/dev/null)
+            fi ;;
+        debian)
+            while read -r n; do INST[$n]=1; done < <(dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 2>/dev/null | awk '$1=="ii"{print $2}' | grep -Fx -f <(echo "$names"))
+            while read -r n; do AVAIL[$n]=1; done < <(apt-cache policy "${PKGS[@]}" 2>/dev/null | awk '/^[^ ]/{p=$1; sub(":$","",p)} /Candidate:/{if($2!="(none)")print p}') ;;
     esac
 }
+installed_pkg() { [[ -n ${INST[$1]:-} ]]; }
 have() { installed_pkg "$1" || { [[ -n ${CMD_OF[$1]:-} ]] && command -v "${CMD_OF[$1]}" >/dev/null 2>&1; }; }
-has_pkg() {  # is this package available from the distro's repos?
-    case $DISTRO in
-        arch)   pacman -Si "$1" &>/dev/null ;;
-        fedora) ((ATOMIC)) && return 0   # rpm-ostree can't be queried cheaply: pkg_install reports what failed
-                dnf -q info "$1" &>/dev/null ;;
-        debian) [[ -n $(apt-cache policy "$1" 2>/dev/null | sed -n 's/^ *Candidate: //p' | grep -v '(none)') ]] ;;
-    esac
-}
+has_pkg() { ((ATOMIC)) && return 0; [[ -n ${AVAIL[$1]:-} ]]; }   # atomic: pkg_install reports what failed
 # Immutable Fedora: Bazzite ships its own (Terra) Xwayland, which conflicts with the one Hyprland's package asks for.
 XWL_TRIED=0; XWL_PENDING=0; DEFERRED=()
 fix_xwayland() {
@@ -255,11 +265,17 @@ atomic_install() {
         list=("${keep[@]}")
         ((${#list[@]})) || { rm -f "$tmp"; return 0; }
     done
-    echo "  Some packages conflict with this system, installing them one at a time..."
-    for p in "${list[@]}"; do
+    echo "  Some packages conflict with this system, retrying in small groups..."
+    local i g size=6
+    for ((i = 0; i < ${#list[@]}; i += size)); do
+        g=("${list[@]:i:size}")
         rpmostree_wait
-        if sudo rpm-ostree install --idempotent --allow-inactive "$p" 2>&1 | tee "$tmp"; [[ ${PIPESTATUS[0]} -eq 0 ]]; then continue; fi
-        MISSING+=("$p")
+        if sudo rpm-ostree install --idempotent --allow-inactive "${g[@]}" 2>&1 | tee "$tmp"; [[ ${PIPESTATUS[0]} -eq 0 ]]; then continue; fi
+        for p in "${g[@]}"; do   # only the failing group is split up
+            rpmostree_wait
+            if sudo rpm-ostree install --idempotent --allow-inactive "$p" 2>&1 | tee "$tmp"; [[ ${PIPESTATUS[0]} -eq 0 ]]; then continue; fi
+            MISSING+=("$p")
+        done
     done
     rm -f "$tmp"
 }
@@ -270,7 +286,7 @@ pkg_install() {
         fedora)
             if ((ATOMIC)); then atomic_install "$@"
             else
-                sudo dnf install -y "$@"
+                sudo dnf install -y --setopt=max_parallel_downloads=10 "$@"
             fi ;;
         debian) sudo apt-get install -y "$@" ;;
     esac
@@ -309,7 +325,7 @@ else
                         "https://copr.fedorainfracloud.org/coprs/$o/$p/repo/fedora-$FEDORA_VER/$o-$p-fedora-$FEDORA_VER.repo"
                 else
                     say "Enabling the $COPR Hyprland COPR (Fedora's own Hyprland is too old for this config)"
-                    sudo dnf install -y dnf-plugins-core
+                    dnf copr --help >/dev/null 2>&1 || sudo dnf install -y dnf-plugins-core
                     sudo dnf copr enable -y "$COPR"
                 fi
             else
@@ -321,6 +337,12 @@ else
         debian) sudo apt-get update ;;
     esac
     say "Installing packages (anything your distro doesn't ship is listed at the end)"
+    if [[ $DISTRO != arch ]]; then   # download the font and the prompt in the background while packages install
+        PREFETCH_LOG=$(mktemp)
+        { install_nerd_font; install_starship; } >"$PREFETCH_LOG" 2>&1 &
+        PREFETCH_PID=$!
+    fi
+    load_state
     want=()
     for p in "${PKGS[@]}"; do
         if ((ATOMIC)) && [[ $p == sddm ]]; then continue; fi   # the image already has its own login screen
@@ -331,18 +353,25 @@ else
     ((${#SKIPPED[@]})) && echo "  Already installed, skipping: ${SKIPPED[*]}"
     if ((${#want[@]})); then echo "  Installing: ${want[*]}"; pkg_install "${want[@]}"; else echo "  Nothing to install from the repos."; fi
     if [[ $DISTRO == arch ]]; then
-        helper=$(command -v yay || command -v paru || true)
-        if [[ -n $helper ]]; then
-            say "Installing AUR packages with ${helper##*/}"
-            aur_want=(); for p in "${AUR[@]}"; do have "$p" || aur_want+=("$p"); done
-            ((${#aur_want[@]})) && { "$helper" -S --needed --noconfirm "${aur_want[@]}" || MISSING+=("${aur_want[@]}"); }
-        else
-            for p in "${AUR[@]}"; do have "$p" || MISSING+=("$p"); done
-            echo "No yay/paru found: install the missing AUR packages yourself (${AUR[*]})"
+        aur_try=(); for p in "${MISSING[@]}" "${AUR[@]}"; do have "$p" || aur_try+=("$p"); done
+        MISSING=()
+        if ((${#aur_try[@]})); then
+            helper=$(command -v yay || command -v paru || true)
+            if [[ -n $helper ]]; then
+                say "Installing from the AUR with ${helper##*/}: ${aur_try[*]}"
+                if ! "$helper" -S --needed --noconfirm "${aur_try[@]}"; then
+                    for p in "${aur_try[@]}"; do "$helper" -S --needed --noconfirm "$p" || MISSING+=("$p"); done
+                fi
+            else
+                MISSING+=("${aur_try[@]}"); echo "No yay or paru found: install these from the AUR yourself: ${aur_try[*]}"
+            fi
         fi
+        install_nerd_font
     fi
-    install_nerd_font
-    [[ $DISTRO != arch ]] && install_starship
+    if [[ -n ${PREFETCH_PID:-} ]]; then
+        wait "$PREFETCH_PID" || echo "  (the font/prompt download had a problem)"
+        sed -n 's/^.*==> //p' "$PREFETCH_LOG" | sed 's/^/  /'
+    fi
 fi
 
 # ---- SDDM: the login screen, set to start Hyprland ----------------------------------------
