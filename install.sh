@@ -241,6 +241,11 @@ fix_xwayland() {
     local cur; cur=$(rpm -qa 2>/dev/null | grep -i 'xorg-x11-server-Xwayland' | grep -vi '^xorg-x11-server-Xwayland-[0-9]' | head -1)
     [[ -z $cur ]] && return 1
     cur=${cur%%-[0-9]*}
+    if [[ $cur == terra-* ]]; then   # Bazzite: tried repeatedly, rpm-ostree cannot swap this one (see offer_wayblue at the end)
+        XWL_MODE=blocked
+        HYPR_ERR="Bazzite's own Xwayland ($cur) conflicts with the Xwayland that Hyprland's package needs, and rpm-ostree cannot swap it."
+        return 1
+    fi
     echo "  This system ships its own Xwayland ($cur), which blocks Hyprland's package."
     echo "  I will swap it for Fedora's Xwayland (older version, fine for Hyprland) and install everything in one step."
     echo "  It takes effect at the next reboot. Your current system stays bootable: if anything looks wrong, pick the previous"
@@ -278,6 +283,11 @@ atomic_install() {
         if [[ -z $nf ]]; then
             if { grep -qi 'xwayland' "$tmp" || { printf '%s\n' "${list[@]}" | grep -qx hyprland && rpm -qa 2>/dev/null | grep -qi '^terra-xorg-x11-server-Xwayland'; }; } && fix_xwayland; then
                 XWL_PENDING=1; rm -f "$tmp"; return 0   # everything, Hyprland included, is queued together for the next boot
+            fi
+            if [[ $XWL_MODE == blocked ]]; then
+                keep=(); for p in "${list[@]}"; do [[ $p == hyprland || $p == xdg-desktop-portal-hyprland ]] && continue; keep+=("$p"); done
+                MISSING+=(hyprland); list=("${keep[@]}"); ((${#list[@]})) || { rm -f "$tmp"; return 0; }
+                continue
             fi
             break
         fi
@@ -431,7 +441,12 @@ fi
 [[ $DISTRO != unknown ]] && preselect_hyprland_session
 
 # ---- NVIDIA ----------------------------------------------------------------------------
-if ((HAS_NVIDIA)) && ((ATOMIC)); then
+if ((HAS_NVIDIA)) && ((ATOMIC)) && rpm-ostree status 2>/dev/null | grep -qi wayblue; then
+    say "NVIDIA GPU found (Wayblue image): setting the kernel options it needs"
+    sudo rpm-ostree kargs --append-if-missing=rd.driver.blacklist=nouveau --append-if-missing=modprobe.blacklist=nouveau \
+        --append-if-missing=nvidia-drm.modeset=1 --append-if-missing=nvidia-drm.fbdev=1 || true
+    echo "  Reboot once after this installer so the options apply."
+elif ((HAS_NVIDIA)) && ((ATOMIC)); then
     say "NVIDIA GPU found"
     echo "  Bazzite/Fedora Atomic NVIDIA images already include the driver, so I'm not touching it."
 elif ((HAS_NVIDIA)) && [[ $DISTRO != unknown ]]; then
@@ -518,6 +533,39 @@ fi
 say "Generating the default style (noir)"
 "$CFG/rices/wardrobe.py" apply noir || true
 
+# Fedora Atomic (Bazzite): Hyprland's package cannot be layered next to Terra's Xwayland. The reliable route is an image that ships Hyprland.
+offer_wayblue() {
+    ((ATOMIC)) || return 0
+    rpm-ostree status 2>/dev/null | grep -qi wayblue && return 0
+    local img=hyprland cur
+    case $GPU in nvidia|hybrid-amd|hybrid-intel) img=hyprland-nvidia-open ;; esac
+    cur=$(rpm-ostree status --json 2>/dev/null | python3 -c "
+import json,sys
+try:
+    d=json.load(sys.stdin); b=[x for x in d['deployments'] if x.get('booted')]; print(b[0].get('container-image-reference','') if b else '')
+except Exception: pass" 2>/dev/null)
+    echo
+    echo "  Hyprland can't be added on top of this system image: Bazzite's own Xwayland blocks Hyprland's package, and no repo has a fix."
+    echo "  What does work on Fedora Atomic is Wayblue's Hyprland image ($img): Hyprland, Waybar and the NVIDIA setup come preinstalled,"
+    echo "  and this installer then adds the rice on top. You lose Bazzite's extras (game mode, Bazzite tools)."
+    echo "  You can go back at any time with:  sudo rpm-ostree rebase ${cur:-ostree-image-signed:docker://ghcr.io/ublue-os/bazzite:stable}"
+    [[ -r /dev/tty ]] || return 0
+    local ans=n; read -r -p "  Switch to the Wayblue image now? (two reboots, then run ./install.sh again) [y/N] " ans </dev/tty || return 0
+    [[ $ans =~ ^[Yy] ]] || { echo "  OK, nothing changed."; return 0; }
+    rpmostree_wait
+    sudo rpm-ostree reset || true
+    sudo rpm-ostree rebase "ostree-unverified-registry:ghcr.io/wayblueorg/$img:latest"
+    cat <<MSG
+
+  Step 1 of 2 is done. Now:
+    systemctl reboot
+  After that reboot (it can take a while the first time), run these two commands, then reboot again:
+    sudo rpm-ostree rebase ostree-image-signed:docker://ghcr.io/wayblueorg/$img:latest
+    systemctl reboot
+  Then run  ./install.sh  one more time: it detects Wayblue and finishes the setup (including the NVIDIA settings).
+MSG
+}
+
 # At the end: say clearly whether Hyprland is really there (and if not, why)
 verify_hyprland() {
     say "Checking that Hyprland is installed"
@@ -536,6 +584,7 @@ verify_hyprland() {
         echo "  The package manager refused to install it. What it said:"
         if [[ -n $HYPR_ERR ]]; then sed 's/^/    /' <<<"$HYPR_ERR"; else echo "    (see the red error lines above)"; fi
         echo "  Run ./diagnose.sh and send me its output together with a photo of the lines above."
+        offer_wayblue
     elif ((XWL_PENDING)); then echo "  Reason: it waits for the Xwayland swap. Reboot, then run ./install.sh again."
     else echo "  Run ./diagnose.sh and send me what it prints."; fi
 }
