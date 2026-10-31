@@ -26,10 +26,12 @@ Wallpapers are public-domain NASA photos (credits in `wallpapers/CREDITS.md`).
 ## Install
 
 ```sh
-git clone https://github.com/dork40/hyprland-rice.git
-cd hyprland-rice
+git clone https://github.com/dork40/hyprland-rice.git ~/hyprland-rice 2>/dev/null || git -C ~/hyprland-rice pull
+cd ~/hyprland-rice
 ./install.sh   # installs everything: packages (asks for sudo), configs, wallpapers, the apps below
 ```
+
+That block works the first time and every time after: it downloads the rice, or updates it if you already have it. The installer also updates itself to the latest version before it starts.
 
 The installer is all-in-one: there are no options to pick through. It checks every package one by one and **skips what you already have** (already running Hyprland but no wofi? It installs just wofi, and the rest). It also installs **SDDM** as your login screen and sets it to start Hyprland. It installs only what the rice itself uses: Hyprland and its helpers (hypridle, hyprpaper, hyprpicker), Waybar, wofi, dunst, kitty, swayosd, wlogout, thunar (files), clipboard history, screenshots and screen recording, media keys, the volume/network/Bluetooth applets, the starship prompt and the JetBrainsMono Nerd Font. It does not install anyone's personal apps.
 

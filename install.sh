@@ -18,6 +18,18 @@ for a in "$@"; do
         *) echo "unknown option: $a"; exit 1 ;;
     esac
 done
+# Make sure this copy is the latest: if it is a git clone with no local edits, pull and restart with the new installer.
+# (Set RICE_NO_UPDATE=1 to skip.)
+if [[ -d $HERE/.git && -z ${RICE_UPDATED:-} && -z ${RICE_NO_UPDATE:-} ]] && command -v git >/dev/null; then
+    if git -C "$HERE" diff --quiet && git -C "$HERE" diff --cached --quiet; then
+        before=$(git -C "$HERE" rev-parse HEAD)
+        git -C "$HERE" pull --ff-only -q 2>/dev/null || true
+        if [[ $(git -C "$HERE" rev-parse HEAD) != "$before" ]]; then
+            echo "Updated the installer to the latest version, restarting it..."
+            RICE_UPDATED=1 exec bash "$HERE/install.sh" "$@"
+        fi
+    fi
+fi
 say() { printf '\n\033[1;35m==>\033[0m \033[1m%s\033[0m\n' "$*"; }
 
 # ---- distro ---------------------------------------------------------------
