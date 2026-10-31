@@ -200,28 +200,55 @@ have() { installed_pkg "$1" || { [[ -n ${CMD_OF[$1]:-} ]] && command -v "${CMD_O
 has_pkg() { ((ATOMIC)) && return 0; [[ -n ${AVAIL[$1]:-} ]]; }   # atomic: pkg_install reports what failed
 # Immutable Fedora: Bazzite ships its own (Terra) Xwayland, which conflicts with the one Hyprland's package asks for.
 XWL_TRIED=0; XWL_PENDING=0; XWL_MODE=""; DEFERRED=(); HYPR_ERR=""
+# Bazzite ships Terra's Xwayland, which blocks Hyprland's package. Half-finished earlier attempts leave "inactive" state behind that
+# keeps the solver failing, so: clear this machine's layered packages/overrides (keeping any that are not ours), then do the swap and
+# ALL the installs in one transaction, which needs a single reboot.
+clean_slate_swap() {
+    local cur=$1 tmp attempt p seen=" " args=() other=()
+    tmp=$(mktemp)
+    while read -r p; do [[ -n $p ]] && other+=("$p"); done < <(rpm-ostree status --json 2>/dev/null | python3 -c "
+import json,sys
+try:
+    d=json.load(sys.stdin); b=[x for x in d['deployments'] if x.get('booted')]
+    print('\n'.join(b[0].get('requested-packages',[]) if b else []))
+except Exception: pass" 2>/dev/null)
+    for attempt in 1 2 3 4; do
+        args=(); seen=" "
+        for p in "${PKGS[@]}" "${other[@]}" xorg-x11-server-Xwayland; do
+            [[ $p == sddm || $seen == *" $p "* ]] && continue
+            printf '%s\n' "${MISSING[@]:-}" | grep -qx "$p" && continue
+            seen+="$p "; args+=(--install "$p")
+        done
+        rpmostree_wait
+        if ((attempt == 1)); then echo "  Clearing the earlier half-finished package changes..."; sudo rpm-ostree reset || true; fi
+        set +e; sudo rpm-ostree override remove "$cur" "${args[@]}" 2>&1 | tee "$tmp"; local rc=${PIPESTATUS[0]}; set -e
+        ((rc == 0)) && { rm -f "$tmp"; return 0; }
+        local nf; nf=$(sed -n 's/.*Packages not found: //p' "$tmp" | head -1)
+        [[ -z $nf ]] && break
+        echo "  Not in your Fedora's repos, skipping: $nf"
+        for p in $nf; do MISSING+=("$p"); done
+    done
+    HYPR_ERR=$(grep -iE 'error|problem|conflict|requires|not found|nothing provides' "$tmp" | head -6)
+    # leave the machine as it was before: put the packages back, without Hyprland
+    echo "  That didn't work. Restoring the packages without Hyprland..."
+    rpmostree_wait
+    local back=(); for p in "${PKGS[@]}" "${other[@]}"; do [[ $p == hyprland || $p == sddm ]] && continue; back+=("$p"); done
+    sudo rpm-ostree install --idempotent --allow-inactive "${back[@]}" >/dev/null 2>&1 || true
+    rm -f "$tmp"; return 1
+}
 fix_xwayland() {
     ((XWL_TRIED)) && return 1; XWL_TRIED=1
     local cur; cur=$(rpm -qa 2>/dev/null | grep -i 'xorg-x11-server-Xwayland' | grep -vi '^xorg-x11-server-Xwayland-[0-9]' | head -1)
     [[ -z $cur ]] && return 1
     cur=${cur%%-[0-9]*}
-    echo "  This system ships its own Xwayland ($cur), which conflicts with the one Hyprland's package asks for."
-    echo "  The swap is applied at the next reboot. Your current system stays bootable: if anything looks wrong,"
-    echo "  pick the previous entry in the boot menu or run: rpm-ostree rollback"
+    echo "  This system ships its own Xwayland ($cur), which blocks Hyprland's package."
+    echo "  I will swap it for Fedora's Xwayland (older version, fine for Hyprland) and install everything in one step."
+    echo "  It takes effect at the next reboot. Your current system stays bootable: if anything looks wrong, pick the previous"
+    echo "  entry in the boot menu or run: rpm-ostree rollback"
     local ans=y
-    if [[ -r /dev/tty ]]; then read -r -p "  Swap it for Fedora's Xwayland (older version, fine for Hyprland) and install Hyprland? [Y/n] " ans </dev/tty || ans=y; fi
+    if [[ -r /dev/tty ]]; then read -r -p "  Continue? [Y/n] " ans </dev/tty || ans=y; fi
     [[ $ans =~ ^[Nn] ]] && return 1
-    rpmostree_wait
-    # The swap goes in ALONE and is applied by a reboot: a Hyprland install in the same step still sees Terra's Xwayland and fails.
-    if sudo rpm-ostree override remove "$cur" --install xorg-x11-server-Xwayland; then
-        XWL_MODE=swap
-        if rpm-ostree status 2>/dev/null | head -30 | grep -qi 'terra-xorg-x11-server-Xwayland'; then
-            echo "  Checked: the swap is staged for the next boot."
-        else
-            echo "  Warning: could not confirm the swap in 'rpm-ostree status'. Run it and look for terra-xorg-x11-server-Xwayland under removed packages."
-        fi
-        return 0
-    fi
+    if clean_slate_swap "$cur"; then XWL_MODE=combined; return 0; fi
     return 1
 }
 # rpm-ostree runs one job at a time. If one is already running (maybe an earlier run of this installer), offer to cancel it.
@@ -243,40 +270,14 @@ swap_pending() {
 atomic_install() {
     local list=("$@") tmp rc nf p keep attempt
     tmp=$(mktemp)
-    if swap_pending && ! rpm-ostree status 2>/dev/null | grep -qE '(^|[[:space:]])hyprland($|[[:space:]])'; then   # swap queued but Hyprland not: hold it back instead of failing again
-        XWL_PENDING=1; keep=()
-        for p in "${list[@]}"; do
-            case $p in hyprland|xdg-desktop-portal-hyprland) DEFERRED+=("$p") ;; *) keep+=("$p") ;; esac
-        done
-        list=("${keep[@]}")
-        echo "  The Xwayland swap is already staged, so Hyprland itself waits for the reboot."
-    fi
     for attempt in 1 2 3 4; do
         rpmostree_wait
         set +e; sudo rpm-ostree install --idempotent --allow-inactive "${list[@]}" 2>&1 | tee "$tmp"; rc=${PIPESTATUS[0]}; set -e
         ((rc == 0)) && { rm -f "$tmp"; return 0; }
         nf=$(sed -n 's/.*Packages not found: //p' "$tmp" | head -1)
         if [[ -z $nf ]]; then
-            if grep -qi 'Inactive base removals' "$tmp" && grep -qi 'terra-xorg-x11-server-Xwayland' "$tmp"; then
-                # the swap is ALREADY staged (rpm-ostree lists it in its own error output): Hyprland just has to wait for the reboot
-                echo "  The Xwayland swap is already staged for the next boot. Hyprland can only be installed after that reboot."
-                XWL_PENDING=1; XWL_MODE=swap; keep=()
-                for p in "${list[@]}"; do
-                    case $p in hyprland|xdg-desktop-portal-hyprland) DEFERRED+=("$p") ;; *) keep+=("$p") ;; esac
-                done
-                list=("${keep[@]}"); ((${#list[@]})) || { rm -f "$tmp"; return 0; }
-                continue
-            fi
             if { grep -qi 'xwayland' "$tmp" || { printf '%s\n' "${list[@]}" | grep -qx hyprland && rpm -qa 2>/dev/null | grep -qi '^terra-xorg-x11-server-Xwayland'; }; } && fix_xwayland; then
-                XWL_PENDING=1; keep=()
-                for p in "${list[@]}"; do
-                    case $p in
-                        hyprland|xdg-desktop-portal-hyprland) [[ $XWL_MODE == combined ]] || DEFERRED+=("$p") ;;   # already queued, or held back for the next run
-                        *) keep+=("$p") ;;
-                    esac
-                done
-                list=("${keep[@]}"); ((${#list[@]})) || { rm -f "$tmp"; return 0; }
-                continue
+                XWL_PENDING=1; rm -f "$tmp"; return 0   # everything, Hyprland included, is queued together for the next boot
             fi
             break
         fi
