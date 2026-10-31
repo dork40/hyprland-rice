@@ -37,6 +37,12 @@ The installer asks two questions (laptop or PC, and which graphics card) and the
 
 Existing configs are backed up to `~/.config-rice-backup-<date>` before anything is overwritten.
 
+## Getting into Hyprland
+
+After the install (and the reboot it asks for), the login screen starts Hyprland by default. If it still offers your old desktop (it says something like "Plasma (Wayland)"), click that session label, usually at the bottom-left of the screen, choose **Hyprland**, and log in. If there is no session menu, press `Ctrl+Alt+F3`, log in as text and type `Hyprland`.
+
+On Bazzite and other immutable Fedora systems the installer needs two runs with a reboot between them. It tells you when.
+
 ## AI switcher
 
 - **`Super+Shift+Ctrl+` ` `` ` `** (the backtick key) **switches agent**: a menu shows every AI with a status dot (● ready, ◐ installed but not signed in yet, ○ not installed). Pick one and it becomes your AI and opens.

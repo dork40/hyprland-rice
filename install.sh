@@ -375,6 +375,12 @@ else
 fi
 
 # ---- SDDM: the login screen, set to start Hyprland ----------------------------------------
+# The login screen remembers the last session; make that Hyprland (also on immutable Fedora/Bazzite, where SDDM already exists)
+preselect_hyprland_session() {
+    command -v sddm >/dev/null || [[ -d /var/lib/sddm ]] || return 0
+    sudo mkdir -p /var/lib/sddm
+    printf '[Last]\nSession=/usr/share/wayland-sessions/hyprland.desktop\nUser=%s\n' "${SUDO_USER:-$USER}" | sudo tee /var/lib/sddm/state.conf >/dev/null
+}
 setup_sddm() {
     command -v sddm >/dev/null || return 0
     say "Setting up SDDM as your login screen"
@@ -382,10 +388,6 @@ setup_sddm() {
     [[ $DISTRO == debian ]] && echo /usr/bin/sddm | sudo tee /etc/X11/default-display-manager >/dev/null
     sudo systemctl enable -f sddm.service
     sudo mkdir -p /var/lib/sddm
-    if [[ ! -e /var/lib/sddm/state.conf ]]; then   # preselect the Hyprland session the first time
-        local sess=/usr/share/wayland-sessions/hyprland.desktop
-        [[ -e $sess ]] && printf '[Last]\nSession=%s\n' "$sess" | sudo tee /var/lib/sddm/state.conf >/dev/null
-    fi
     if [[ -n $current && $current != sddm.service && $current != . ]]; then
         echo "  Switched your login screen from ${current%.service} to SDDM. It takes effect at the next reboot."
     else
@@ -397,6 +399,7 @@ if ((ATOMIC)); then
 elif [[ $DISTRO != unknown ]]; then
     setup_sddm
 fi
+[[ $DISTRO != unknown ]] && preselect_hyprland_session
 
 # ---- NVIDIA ----------------------------------------------------------------------------
 if ((HAS_NVIDIA)) && ((ATOMIC)); then
@@ -509,14 +512,18 @@ if ((XWL_PENDING)); then
 cat <<MSG
 
 Almost done. Reboot now, then run  ./install.sh  one more time to finish: ${DEFERRED[*]} could not be installed yet,
-because the Xwayland swap above only takes effect after a reboot. After the second run, reboot again and pick the Hyprland session.
+because the Xwayland swap above only takes effect after a reboot. After the second run, reboot again.
+At the login screen Hyprland is preselected. If it still says "Plasma (Wayland)", click that label (usually bottom-left)
+and choose Hyprland. No session menu? Press Ctrl+Alt+F3, log in, and type: Hyprland
 Everything else (configs, wallpapers, the other packages) is already in place.
 MSG
 exit 0
 fi
 cat <<MSG
 
-Done. Reboot, then pick the Hyprland session on the login screen.
+Done. Reboot, then log in.
+At the login screen Hyprland is preselected. If it still says "Plasma (Wayland)", click that label (usually bottom-left)
+and choose Hyprland. No session menu? Press Ctrl+Alt+F3, log in, and type: Hyprland
   Super+Shift+R   switch rice style (Wardrobe)       Super+W   wallpapers
   Super+Shift+D   displays                           Super+F1  welcome / how to use it
   Super+/         cheat sheet of every shortcut
