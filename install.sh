@@ -199,7 +199,7 @@ installed_pkg() { [[ -n ${INST[$1]:-} ]]; }
 have() { installed_pkg "$1" || { [[ -n ${CMD_OF[$1]:-} ]] && command -v "${CMD_OF[$1]}" >/dev/null 2>&1; }; }
 has_pkg() { ((ATOMIC)) && return 0; [[ -n ${AVAIL[$1]:-} ]]; }   # atomic: pkg_install reports what failed
 # Immutable Fedora: Bazzite ships its own (Terra) Xwayland, which conflicts with the one Hyprland's package asks for.
-XWL_TRIED=0; XWL_PENDING=0; XWL_MODE=""; DEFERRED=()
+XWL_TRIED=0; XWL_PENDING=0; XWL_MODE=""; DEFERRED=(); HYPR_ERR=""
 fix_xwayland() {
     ((XWL_TRIED)) && return 1; XWL_TRIED=1
     local cur; cur=$(rpm -qa 2>/dev/null | grep -i 'xorg-x11-server-Xwayland' | grep -vi '^xorg-x11-server-Xwayland-[0-9]' | head -1)
@@ -254,7 +254,7 @@ atomic_install() {
         ((rc == 0)) && { rm -f "$tmp"; return 0; }
         nf=$(sed -n 's/.*Packages not found: //p' "$tmp" | head -1)
         if [[ -z $nf ]]; then
-            if grep -qi 'xwayland' "$tmp" && fix_xwayland; then
+            if { grep -qi 'xwayland' "$tmp" || { printf '%s\n' "${list[@]}" | grep -qx hyprland && rpm -qa 2>/dev/null | grep -qi '^terra-xorg-x11-server-Xwayland'; }; } && fix_xwayland; then
                 XWL_PENDING=1; keep=()
                 for p in "${list[@]}"; do
                     case $p in
@@ -284,6 +284,7 @@ atomic_install() {
         for p in "${g[@]}"; do   # only the failing group is split up
             rpmostree_wait
             if sudo rpm-ostree install --idempotent --allow-inactive "$p" 2>&1 | tee "$tmp"; [[ ${PIPESTATUS[0]} -eq 0 ]]; then continue; fi
+            [[ $p == hyprland ]] && HYPR_ERR=$(grep -iE 'error|problem|conflict|requires|not found|nothing provides' "$tmp" | head -6)
             MISSING+=("$p")
         done
     done
@@ -516,7 +517,11 @@ verify_hyprland() {
         echo "  Hyprland is queued in the next boot image. Reboot to get it; it will then appear in the login screen's session menu."; return 0
     fi
     echo "  Hyprland is NOT installed yet, so the login screen can't offer it."
-    if printf '%s\n' "${MISSING[@]:-}" | grep -qi hyprland; then echo "  Reason: your distro's repos don't have a Hyprland new enough (listed above)."
+    if printf '%s\n' "${MISSING[@]:-}" | grep -qi 'hyprland(0.56+)'; then echo "  Reason: no Hyprland COPR has packages for your Fedora version (see above)."
+    elif printf '%s\n' "${MISSING[@]:-}" | grep -qi hyprland; then
+        echo "  The package manager refused to install it. What it said:"
+        if [[ -n $HYPR_ERR ]]; then sed 's/^/    /' <<<"$HYPR_ERR"; else echo "    (see the red error lines above)"; fi
+        echo "  Run ./diagnose.sh and send me its output together with a photo of the lines above."
     elif ((XWL_PENDING)); then echo "  Reason: it waits for the Xwayland swap. Reboot, then run ./install.sh again."
     else echo "  Run ./diagnose.sh and send me what it prints."; fi
 }
