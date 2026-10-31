@@ -213,10 +213,23 @@ rpmostree_wait() {
     sudo rpm-ostree cancel || true
     sleep 2
 }
+# Is the Xwayland swap already staged (terra's still installed, but its removal is queued for the next boot)?
+swap_pending() {
+    rpm -qa 2>/dev/null | grep -qi '^terra-xorg-x11-server-Xwayland' || return 1
+    rpm-ostree status 2>/dev/null | grep -qi 'terra-xorg-x11-server-Xwayland'
+}
 # Layer packages with rpm-ostree: drop the ones Fedora doesn't have, then fall back to one at a time for conflicts.
 atomic_install() {
     local list=("$@") tmp rc nf p keep attempt
     tmp=$(mktemp)
+    if swap_pending; then   # a previous run already staged the swap: hold Hyprland back right away instead of failing on it again
+        XWL_PENDING=1; keep=()
+        for p in "${list[@]}"; do
+            case $p in hyprland|xdg-desktop-portal-hyprland) DEFERRED+=("$p") ;; *) keep+=("$p") ;; esac
+        done
+        list=("${keep[@]}")
+        echo "  The Xwayland swap is already staged, so Hyprland itself waits for the reboot."
+    fi
     for attempt in 1 2 3 4; do
         rpmostree_wait
         set +e; sudo rpm-ostree install --idempotent --allow-inactive "${list[@]}" 2>&1 | tee "$tmp"; rc=${PIPESTATUS[0]}; set -e
