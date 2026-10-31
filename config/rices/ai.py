@@ -5,6 +5,7 @@
   ai.py assign    change which AI a key opens
   ai.py select    switch agent: pick which AI is "selected" and open it (Super+Shift+Ctrl+`)
   ai.py open      open the selected AI (Super+Shift+Ctrl+A); asks first if none is selected yet
+  ai.py yolo [on|off|toggle]   yolo mode: start the selected CLI with "don't ask permission" flags (off by default)
   ai.py pick      plain menu of every AI (opens the one you click without selecting it)
   ai.py list      print the catalogue
 Number keys Super+Shift+Ctrl+1..0 map to the first ten entries of ORDER.
@@ -14,6 +15,7 @@ import json, os, pathlib, shlex, shutil, subprocess, sys
 HOME = pathlib.Path.home()
 OVERRIDES = HOME / ".config/hypr/ai-overrides.json"
 SELECTED = HOME / ".config/hypr/ai-selected.json"   # {"id": "claude"}
+YOLO_FILE = HOME / ".config/hypr/ai-yolo"            # exists = yolo mode on
 SLOTS = HOME / ".config/hypr/ai-slots.json"      # {"1": "claude", ...} filled in as keys are used for the first time
 
 # id: (name, kind, command-or-url, install hint)   kind: cli | web
@@ -36,23 +38,52 @@ CATALOG = {
     "goose":      ("Goose",            "cli", "goose",      "see https://block.github.io/goose"),
     "copilot-cli": ("GitHub Copilot CLI", "cli", "copilot", "npm install -g @github/copilot"),
 }
+# Flags that make each terminal AI stop asking for permission before it edits files or runs commands.
+# DANGEROUS: it can change or delete anything your user can. Off unless you turn yolo mode on.
+YOLO_FLAGS = {
+    "claude": "--dangerously-skip-permissions",
+    "codex": "--dangerously-bypass-approvals-and-sandbox",
+    "gemini": "--yolo",
+    "aider": "--yes-always",
+    "qwen": "--yolo",
+    "copilot-cli": "--allow-all-tools",
+}
+YOLO_ENV = {"goose": "GOOSE_MODE=auto"}
 ORDER = ["claude", "codex", "gemini", "opencode", "aider", "ollama", "chatgpt", "claude-web", "gemini-web", "perplexity"]
+
+
+def yolo_on():
+    return YOLO_FILE.exists()
 
 
 def command(i):
     name, kind, cmd, hint = CATALOG[i]
     try:
-        cmd = json.loads(OVERRIDES.read_text()).get(i, cmd)
+        over = json.loads(OVERRIDES.read_text())
     except (OSError, ValueError):
-        pass
+        over = {}
+    if i in over:
+        return over[i]                      # your own command wins, flags included
+    if kind == "cli" and yolo_on():
+        if i in YOLO_FLAGS:
+            cmd = f"{cmd} {YOLO_FLAGS[i]}"
+        elif i in YOLO_ENV:
+            cmd = f"{YOLO_ENV[i]} {cmd}"
     return cmd
+
+
+def yolo_supported(i):
+    return i in YOLO_FLAGS or i in YOLO_ENV
 
 
 def installed(i):
     name, kind, cmd, hint = CATALOG[i]
     if kind == "web":
         return True
-    first = shlex.split(command(i))[0]
+    parts = shlex.split(command(i))
+    while parts and "=" in parts[0] and not parts[0].startswith(("/", "~", ".")):   # skip VAR=value prefixes
+        parts.pop(0)
+    first = parts[0]
     first = os.path.expanduser(first)
     if first == "sh":                      # wrapper commands (ollama): check the real tool
         first = "ollama"
@@ -147,14 +178,18 @@ def load_slots():
         return {}
 
 
-def ask(title, ids, default=None):
+def ask(title, ids, default=None, extra=()):
     """Show a menu of AIs and return the chosen id (None if cancelled). The suggested one is listed first."""
     ids = ([default] if default in ids else []) + [i for i in ids if i != default]
     lines = [f"{status(i)}  {CATALOG[i][0]:<20} {'web' if CATALOG[i][1] == 'web' else 'terminal'}"
              + ("   (suggested)" if i == default else "") for i in ids]
-    r = subprocess.run(["wofi", "--dmenu", "--prompt", title, "--width", "620", "--lines", str(min(len(lines), 12)),
-                        "--insensitive", "--cache-file", "/dev/null"], input="\n".join(lines), text=True, capture_output=True)
+    labels = [l for l, _ in extra]
+    shown = lines + labels
+    r = subprocess.run(["wofi", "--dmenu", "--prompt", title, "--width", "620", "--lines", str(min(len(shown), 14)),
+                        "--insensitive", "--cache-file", "/dev/null"], input="\n".join(shown), text=True, capture_output=True)
     sel = r.stdout.rstrip("\n")
+    if sel in labels:
+        return dict(extra)[sel]
     return ids[lines.index(sel)] if sel in lines else None
 
 
@@ -183,7 +218,13 @@ def selected():
 def select():
     """Switch agent: choose the AI that Super+Shift+Ctrl+A opens, and open it now."""
     cur = selected()
-    choice = ask("Switch agent  (● ready, ◐ sign in needed, ○ not installed)", list(CATALOG), cur or ORDER[0])
+    toggle = ("⚡  Yolo mode: ON  (no permission prompts)  - click to turn OFF" if yolo_on()
+              else "⚡  Yolo mode: OFF  - click to turn ON (AI won't ask before changing files)")
+    choice = ask("Switch agent  (● ready, ◐ sign in needed, ○ not installed)", list(CATALOG), cur or ORDER[0],
+                 extra=[(toggle, "__yolo__")])
+    if choice == "__yolo__":
+        set_yolo("off" if yolo_on() else "on")
+        return select()
     if not choice:
         return
     SELECTED.parent.mkdir(parents=True, exist_ok=True)
@@ -199,6 +240,17 @@ def open_selected():
     if installed(cur) and logged_in(cur) is False:
         notify(f"{CATALOG[cur][0]} isn't signed in yet: finish signing in in its window")
     launch(cur)
+
+
+def set_yolo(mode="toggle"):
+    on = (not yolo_on()) if mode == "toggle" else mode == "on"
+    YOLO_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if on:
+        YOLO_FILE.touch()
+    elif YOLO_FILE.exists():
+        YOLO_FILE.unlink()
+    notify("Yolo mode ON: your AI won't ask before it changes files or runs commands" if on else "Yolo mode OFF: your AI will ask first")
+    return on
 
 
 def notify(text):
@@ -236,6 +288,9 @@ if __name__ == "__main__":
     a = sys.argv[1] if len(sys.argv) > 1 else "pick"
     if a == "pick":
         pick()
+    elif a == "yolo":
+        m = sys.argv[2] if len(sys.argv) > 2 else "toggle"
+        print("on" if set_yolo(m) else "off") if m != "status" else print("on" if yolo_on() else "off")
     elif a == "select":
         select()
     elif a == "open":

@@ -26,6 +26,8 @@ Existing configs are backed up to `~/.config-rice-backup-<date>` before anything
 - **`Super+Shift+Ctrl+A`** opens your selected AI, or jumps to its window if it is already open. If you haven't picked one yet it asks first.
 - **`Super+Shift+Ctrl+1` to `0`** are one-key shortcuts, one per AI.
 
+**Yolo mode** (off by default) starts your terminal AI without the "may I edit this file / run this command?" prompts. Turn it on or off from the bottom line of the switch-agent menu, or run `ai.py yolo on` / `ai.py yolo off`. It uses each tool's own flag: Claude Code `--dangerously-skip-permissions`, Codex `--dangerously-bypass-approvals-and-sandbox`, Gemini CLI and Qwen Code `--yolo`, Aider `--yes-always`, GitHub Copilot CLI `--allow-all-tools`, Goose `GOOSE_MODE=auto`. **It lets the AI change or delete anything your user can, so only use it where you accept that.** Web AIs and OpenCode/Ollama have no such flag. A command in `ai-overrides.json` always wins over yolo mode.
+
 Sign-in status is a best guess from each tool's login files or API-key variables. Web AIs use whatever your browser is signed in to.
 
 One key per assistant. **The first time you press a key it asks "Which AI do you want?"** (the suggested one is on top) and remembers your answer. After that the key jumps to that AI if it is already open, or opens it. Suggested defaults:
