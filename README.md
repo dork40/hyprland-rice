@@ -1,12 +1,27 @@
 # Hyprland rice
 
-An Arch + Hyprland desktop with a style switcher called **Wardrobe**. One keypress swaps the whole look: Hyprland gaps/borders/blur/animations, Waybar, kitty, wofi, dunst, the volume popup, the power menu, and the wallpaper.
+A complete, good-looking **Hyprland desktop you can install with one command**: a black, glassy, minimal setup with a bar, launcher, notifications, terminal, wallpapers and a handful of small apps that make it easy to live in. Works on **Arch, Fedora and Ubuntu/Debian**, with **NVIDIA support**.
+
+**This is the laptop edition.** Running a desktop PC? Switch to the `pc-edition` branch (`git checkout pc-edition`): no laptop bits, plus an optional max-performance service.
+
+### What you get
+
+- **Wardrobe**: one keypress (`Super+Shift+R`) swaps the whole look at once, wallpaper included (see the three styles below).
+- **A finished desktop**: Waybar, wofi launcher, dunst notifications, kitty terminal, a power menu, volume and brightness pop-ups, clipboard history, an emoji picker, a screenshot tool and a screen text-copy (OCR) shortcut.
+- **Displays app** (`Super+Shift+D`): resolution, refresh rate, scale, rotation and drag-to-arrange for several monitors, with a "keep these settings?" countdown so you can't lock yourself out.
+- **AI switcher** (`Super+Shift+Ctrl+...`): one key to jump to Claude Code, Codex, Gemini, OpenCode, Aider, Ollama or a web chat, with an optional yolo mode.
+- **Welcome window** (`Super+F1`): a first-login guide to the basics, so a new user knows how to open apps, move windows and change the look.
+- **A real installer**: installs the dependencies for your distro, backs up your old configs first, and sets up NVIDIA drivers when it finds an NVIDIA GPU.
+
+### The three styles
 
 | Style | Look |
 |---|---|
-| **noir** | Catppuccin accents on black, floating rounded (default) |
-| **liquid** | Frosted liquid glass: see-through panels, heavy blur |
-| **mono** | Pure greyscale, flat, no animations |
+| **noir** | Catppuccin accents on black, floating rounded corners (default) |
+| **liquid** | Frosted liquid glass: see-through panels, heavy blur, soft corners |
+| **mono** | Pure greyscale, flat and instant, no animations |
+
+Wallpapers are public-domain NASA photos (credits in `wallpapers/CREDITS.md`).
 
 ## Install
 
