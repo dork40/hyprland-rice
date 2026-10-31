@@ -167,6 +167,7 @@ def launch(i):
         inner = (f"echo {q(name + ' is not installed.')}; echo {q('Install with:  ' + hint)}; echo; "
                  + (f"read -p 'Install it now? [y/N] ' a; [ \"$a\" = y ] && {hint}; " if hint.startswith(("npm", "pipx")) else "")
                  + "echo; read -n1 -rsp 'Press any key to close'")
+    inner = 'export PATH="$HOME/.local/bin:$HOME/.npm-global/bin:$HOME/.cargo/bin:$HOME/go/bin:$PATH"; ' + inner   # login shells miss these
     subprocess.Popen(["kitty", "--class", cls, "--title", name, "--directory", str(HOME), "bash", "-lc", inner],
                      start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
