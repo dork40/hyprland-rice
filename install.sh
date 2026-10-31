@@ -123,7 +123,7 @@ fedora)
     PKGS=(hyprland waybar wofi dunst kitty swayosd hypridle hyprpaper wlogout python3 python3-gobject gtk4
           gtk4-layer-shell ffmpeg-free curl libnotify xdg-desktop-portal-hyprland thunar sddm fontconfig xz
           cliphist wl-clipboard grim slurp hyprpicker wf-recorder playerctl tesseract tesseract-langpack-eng btop udiskie
-          network-manager-applet blueman polkit-kde pavucontrol papirus-icon-theme breeze-cursor-theme rofimoji)
+          network-manager-applet blueman polkit-kde pavucontrol papirus-icon-theme breeze-cursor-theme rofimoji awww)
     AUR=()
     NVIDIA=(akmod-nvidia xorg-x11-drv-nvidia-cuda libva-nvidia-driver egl-wayland) ;;
 debian)
@@ -148,6 +148,20 @@ else
         debian:intel|debian:hybrid-intel) PKGS+=(mesa-vulkan-drivers libgl1-mesa-dri intel-media-va-driver) ;;
     esac
 fi
+
+# Fedora: which Hyprland COPR has packages for this Fedora version? (COPRs drop old Fedora versions, so try a few)
+COPR=""; FEDORA_VER=""
+pick_copr() {
+    FEDORA_VER=$(. /etc/os-release; echo "${VERSION_ID:-$(rpm -E %fedora 2>/dev/null)}")
+    local c o p
+    for c in solopasha/hyprland pm4rcin/Hyprland; do
+        o=${c%/*}; p=${c#*/}
+        if curl -fsI -o /dev/null "https://copr.fedorainfracloud.org/coprs/$o/$p/repo/fedora-$FEDORA_VER/$o-$p-fedora-$FEDORA_VER.repo"; then
+            COPR=$c; return 0
+        fi
+    done
+    return 1
+}
 
 MISSING=(); SKIPPED=()
 # package -> the command it provides, so a hand-built or differently packaged tool also counts as "already there"
@@ -215,15 +229,22 @@ else
     say "Detected distro: $DISTRO"
     case $DISTRO in
         fedora)
-            if ((ATOMIC)); then
-                say "Immutable Fedora (Bazzite/Silverblue/Kinoite) found: adding the Hyprland COPR and layering packages with rpm-ostree"
-                ver=$(. /etc/os-release; echo "${VERSION_ID:-$(rpm -E %fedora 2>/dev/null)}")
-                sudo curl -fsSL -o /etc/yum.repos.d/solopasha-hyprland.repo \
-                    "https://copr.fedorainfracloud.org/coprs/solopasha/hyprland/repo/fedora-$ver/solopasha-hyprland-fedora-$ver.repo"
+            if pick_copr; then
+                o=${COPR%/*}; p=${COPR#*/}
+                if ((ATOMIC)); then
+                    say "Immutable Fedora (Bazzite/Silverblue/Kinoite) found: adding the $COPR Hyprland COPR and layering packages with rpm-ostree"
+                    sudo curl -fsSL -o "/etc/yum.repos.d/$o-$p.repo" \
+                        "https://copr.fedorainfracloud.org/coprs/$o/$p/repo/fedora-$FEDORA_VER/$o-$p-fedora-$FEDORA_VER.repo"
+                else
+                    say "Enabling the $COPR Hyprland COPR (Fedora's own Hyprland is too old for this config)"
+                    sudo dnf install -y dnf-plugins-core
+                    sudo dnf copr enable -y "$COPR"
+                fi
             else
-                say "Enabling the Hyprland COPR (Fedora's own Hyprland is too old for this config)"
-                sudo dnf install -y dnf-plugins-core
-                sudo dnf copr enable -y solopasha/hyprland
+                say "No Hyprland COPR has packages for Fedora $FEDORA_VER yet"
+                echo "  This config needs Hyprland 0.56 or newer, and Fedora's own Hyprland is older. I'll install everything else;"
+                echo "  install a current Hyprland yourself (or move to a Fedora version that has a COPR), then run this again."
+                keep=(); for p in "${PKGS[@]}"; do [[ $p == hyprland ]] || keep+=("$p"); done; PKGS=("${keep[@]}"); MISSING+=("hyprland(0.56+)")
             fi ;;
         debian) sudo apt-get update ;;
     esac
