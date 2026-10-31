@@ -489,6 +489,21 @@ fi
 say "Generating the default style (noir)"
 "$CFG/rices/wardrobe.py" apply noir || true
 
+# At the end: say clearly whether Hyprland is really there (and if not, why)
+verify_hyprland() {
+    say "Checking that Hyprland is installed"
+    if [[ -e /usr/share/wayland-sessions/hyprland.desktop ]] && command -v Hyprland >/dev/null; then
+        echo "  OK: Hyprland is installed and its login session exists."; return 0
+    fi
+    if ((ATOMIC)) && rpm-ostree status 2>/dev/null | grep -qi 'hyprland'; then
+        echo "  Hyprland is queued in the next boot image. Reboot to get it; it will then appear in the login screen's session menu."; return 0
+    fi
+    echo "  Hyprland is NOT installed yet, so the login screen can't offer it."
+    if printf '%s\n' "${MISSING[@]:-}" | grep -qi hyprland; then echo "  Reason: your distro's repos don't have a Hyprland new enough (listed above)."
+    elif ((XWL_PENDING)); then echo "  Reason: it waits for the Xwayland swap. Reboot, then run ./install.sh again."
+    else echo "  Run ./diagnose.sh and send me what it prints."; fi
+}
+
 # ---- report ------------------------------------------------------------------------------
 say "Dependency check"
 absent=()
@@ -508,6 +523,7 @@ if command -v Hyprland >/dev/null && ! printf '0.56\n%s\n' "$(Hyprland --version
     echo "  WARNING: this config is written for Hyprland 0.56+ (the Lua config format). Your Hyprland looks older and may not load it."
 fi
 
+verify_hyprland
 if ((XWL_PENDING)); then
 cat <<MSG
 
