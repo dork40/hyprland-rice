@@ -30,6 +30,10 @@ SECTIONS = [
         ("Super + Shift + 1 to 9", "Send the window there"),
         ("Super + scroll", "Next / previous workspace"),
     ]),
+    ("AI assistants", [
+        ("Super + Shift + Ctrl + 1 to 0", "Jump to Claude, Codex, Gemini, OpenCode, Aider, Ollama or the web chats"),
+        ("Super + Shift + Ctrl + A", "Menu of every AI (opens it, or switches to it if it is already open)"),
+    ]),
     ("Handy", [
         ("Print", "Screenshot an area (Shift: window, Ctrl: whole screen)"),
         ("Super + Shift + V", "Clipboard history"),

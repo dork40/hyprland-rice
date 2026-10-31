@@ -1,3 +1,5 @@
+Super + Shift + Ctrl + 1..0  Jump to an AI: Claude, Codex, Gemini, OpenCode, Aider, Ollama, ChatGPT, Claude.ai, Gemini, Perplexity
+Super + Shift + Ctrl + A   AI menu: every assistant (open or switch)
 Super + F1                 Welcome: how to use the rice
 Super + /                  This cheat sheet
 Super + Enter              Terminal (kitty)

@@ -20,6 +20,26 @@ cd hyprland-rice
 
 Existing configs are backed up to `~/.config-rice-backup-<date>` before anything is overwritten.
 
+## AI switcher
+
+One key per assistant. If it is already open you jump straight to it, otherwise it opens:
+
+| Key (with `Super+Shift+Ctrl`) | AI |
+|---|---|
+| `1` | Claude Code |
+| `2` | OpenAI Codex |
+| `3` | Gemini CLI |
+| `4` | OpenCode |
+| `5` | Aider |
+| `6` | Ollama (local models) |
+| `7` | ChatGPT (web) |
+| `8` | Claude.ai (web) |
+| `9` | Gemini (web) |
+| `0` | Perplexity (web) |
+| `A` | menu of all of them, plus Grok, Copilot, Le Chat, DeepSeek, Qwen Code, Goose and GitHub Copilot CLI |
+
+Terminal AIs open in their own kitty window. If one isn't installed, the window shows the install command and offers to run it. Web AIs open as app windows in Chrome/Chromium (or your default browser). `ai.py list` shows what is installed. To change a command, create `~/.config/hypr/ai-overrides.json`, for example `{"claude": "claude --model opus"}`.
+
 ## Welcome window
 
 On your first login a **Welcome** window opens with the basics: how to open apps, close and move windows, switch workspaces, take screenshots, and buttons for changing the style, wallpaper and screens. Reopen it any time with `Super+F1`.
@@ -55,6 +75,8 @@ Anything the distro doesn't ship is listed at the end, so you know what to insta
 | `Super+Shift+R` | Wardrobe: pick a style |
 | `Super+W` | Wallpapers for the current style |
 | `Super+Shift+D` | Displays: resolution, refresh rate, scale, rotation, multi-monitor layout |
+| `Super+Shift+Ctrl+1` to `0` | AI switcher: jump to an AI assistant (see below) |
+| `Super+Shift+Ctrl+A` | AI menu with every assistant |
 | `Super+F1` | Welcome window: how to open apps, move windows, change styles |
 | `Super+/` | Searchable cheat sheet of every shortcut |
 
