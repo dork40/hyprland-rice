@@ -20,6 +20,10 @@ cd hyprland-rice
 
 Existing configs are backed up to `~/.config-rice-backup-<date>` before anything is overwritten.
 
+## Welcome window
+
+On your first login a **Welcome** window opens with the basics: how to open apps, close and move windows, switch workspaces, take screenshots, and buttons for changing the style, wallpaper and screens. Reopen it any time with `Super+F1`.
+
 ## Displays app
 
 `Super+Shift+D` (or "Displays" in your app launcher) opens a screen settings window:
@@ -51,6 +55,7 @@ Anything the distro doesn't ship is listed at the end, so you know what to insta
 | `Super+Shift+R` | Wardrobe: pick a style |
 | `Super+W` | Wallpapers for the current style |
 | `Super+Shift+D` | Displays: resolution, refresh rate, scale, rotation, multi-monitor layout |
+| `Super+F1` | Welcome window: how to open apps, move windows, change styles |
 | `Super+/` | Searchable cheat sheet of every shortcut |
 
 ## NVIDIA

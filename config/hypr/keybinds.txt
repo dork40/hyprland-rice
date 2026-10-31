@@ -1,3 +1,4 @@
+Super + F1                 Welcome: how to use the rice
 Super + /                  This cheat sheet
 Super + Enter              Terminal (kitty)
 Super + R                  App launcher

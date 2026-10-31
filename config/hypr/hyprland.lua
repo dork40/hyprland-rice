@@ -49,6 +49,7 @@ hl.on("hyprland.start", function ()
   -- hl.exec_cmd("~/.config/hypr/scripts/autogame.sh")    -- off by request: game mode no longer turns itself on for games
   hl.exec_cmd("sh -c 'dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE; systemctl --user reset-failed xdg-desktop-portal-hyprland; systemctl --user restart xdg-desktop-portal-hyprland xdg-desktop-portal'")  -- screen sharing/OBS: the portal can crash if it starts before Hyprland after a re-login
   hl.exec_cmd("dunst")
+  hl.exec_cmd("~/.config/rices/welcome.py --first-run")  -- one-time welcome window (reopen with Super+F1)
   hl.exec_cmd("~/.config/hypr/scripts/voxtype-run.sh")  -- dictation daemon (needs the input group, so not the systemd user service)
   hl.exec_cmd("/usr/lib/pam_kwallet_init")  -- unlocks the password keychain with your login (no KWallet popup)
   hl.exec_cmd("command -v kclockd && kclockd")  -- KClock alarms ring even with the Clock window closed
@@ -368,6 +369,7 @@ hl.bind("XF86Launch3", hl.dsp.exec_cmd("rog-control-center"))
 
 -- Wallpaper picker
 hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("~/.config/hypr/scripts/wallpaper.sh"))
+hl.bind(mainMod .. " + F1", hl.dsp.exec_cmd("~/.config/rices/welcome.py"))  -- Welcome: how to use the rice
 hl.bind(mainMod .. " + SHIFT + D", hl.dsp.exec_cmd("~/.config/rices/displays.py"))  -- Displays: resolution, refresh rate, multi-monitor layout
 hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd("~/.config/rices/wardrobe.py pick"))  -- Wardrobe: switch rice style
 
@@ -444,7 +446,7 @@ hl.layer_rule({
 -- Small utility windows open floating and centred instead of tiling
 hl.window_rule({
     name   = "float-utilities",
-    match  = { class = "^(org.pulseaudio.pavucontrol|pavucontrol|blueman-manager|nm-connection-editor|nm-applet|org.kde.polkit-kde-authentication-agent-1|xdg-desktop-portal-gtk|btop|dev.rice.Displays)$" },
+    match  = { class = "^(org.pulseaudio.pavucontrol|pavucontrol|blueman-manager|nm-connection-editor|nm-applet|org.kde.polkit-kde-authentication-agent-1|xdg-desktop-portal-gtk|btop|dev.rice.Displays|dev.rice.Welcome)$" },
     float  = true,
     center = true,
     size   = "900 600",
