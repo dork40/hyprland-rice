@@ -212,13 +212,16 @@ fix_xwayland() {
     if [[ -r /dev/tty ]]; then read -r -p "  Swap it for Fedora's Xwayland (older version, fine for Hyprland) and install Hyprland? [Y/n] " ans </dev/tty || ans=y; fi
     [[ $ans =~ ^[Nn] ]] && return 1
     rpmostree_wait
-    # one transaction: remove Terra's Xwayland, add Fedora's, add Hyprland (a later transaction can't see the swap before a reboot)
-    if sudo rpm-ostree override remove "$cur" --install xorg-x11-server-Xwayland --install hyprland --install xdg-desktop-portal-hyprland; then
-        XWL_MODE=combined; return 0
+    # The swap goes in ALONE and is applied by a reboot: a Hyprland install in the same step still sees Terra's Xwayland and fails.
+    if sudo rpm-ostree override remove "$cur" --install xorg-x11-server-Xwayland; then
+        XWL_MODE=swap
+        if rpm-ostree status 2>/dev/null | head -30 | grep -qi 'terra-xorg-x11-server-Xwayland'; then
+            echo "  Checked: the swap is staged for the next boot."
+        else
+            echo "  Warning: could not confirm the swap in 'rpm-ostree status'. Run it and look for terra-xorg-x11-server-Xwayland under removed packages."
+        fi
+        return 0
     fi
-    echo "  That didn't work in one step; staging just the swap, Hyprland will install on the next run."
-    rpmostree_wait
-    if sudo rpm-ostree override remove "$cur" --install xorg-x11-server-Xwayland; then XWL_MODE=swap; return 0; fi
     return 1
 }
 # rpm-ostree runs one job at a time. If one is already running (maybe an earlier run of this installer), offer to cancel it.
