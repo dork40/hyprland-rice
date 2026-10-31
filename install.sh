@@ -203,11 +203,25 @@ fix_xwayland() {
     [[ $ans =~ ^[Nn] ]] && return 1
     sudo rpm-ostree override remove "$cur" --install xorg-x11-server-Xwayland
 }
+# rpm-ostree runs one job at a time. If an earlier run is still going, wait for it (or offer to cancel it).
+rpmostree_wait() {
+    local i ans=y
+    for ((i = 1; i <= 60; i++)); do
+        rpm-ostree status 2>/dev/null | grep -qiE '^ *(State: busy|Transaction:)' || return 0
+        ((i == 1)) && echo "  Another rpm-ostree job is still running (maybe an earlier run of this installer). Waiting for it to finish..."
+        sleep 5
+    done
+    echo "  It is still busy after 5 minutes."
+    [[ -r /dev/tty ]] && { read -r -p "  Cancel that job and continue? [Y/n] " ans </dev/tty || ans=y; }
+    if [[ $ans =~ ^[Nn] ]]; then echo "  Stopping. When ready: sudo rpm-ostree cancel, then run ./install.sh again."; exit 1; fi
+    sudo rpm-ostree cancel || true; sleep 2
+}
 # Layer packages with rpm-ostree: drop the ones Fedora doesn't have, then fall back to one at a time for conflicts.
 atomic_install() {
     local list=("$@") tmp rc nf p keep attempt
     tmp=$(mktemp)
     for attempt in 1 2 3 4; do
+        rpmostree_wait
         set +e; sudo rpm-ostree install --idempotent --allow-inactive "${list[@]}" 2>&1 | tee "$tmp"; rc=${PIPESTATUS[0]}; set -e
         ((rc == 0)) && { rm -f "$tmp"; return 0; }
         nf=$(sed -n 's/.*Packages not found: //p' "$tmp" | head -1)
@@ -233,6 +247,7 @@ atomic_install() {
     done
     echo "  Some packages conflict with this system, installing them one at a time..."
     for p in "${list[@]}"; do
+        rpmostree_wait
         if sudo rpm-ostree install --idempotent --allow-inactive "$p" 2>&1 | tee "$tmp"; [[ ${PIPESTATUS[0]} -eq 0 ]]; then continue; fi
         MISSING+=("$p")
     done
