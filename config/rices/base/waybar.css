@@ -1,0 +1,195 @@
+* {
+    font-family: "JetBrainsMono Nerd Font", "Noto Sans", sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    min-height: 0;
+    border: none;
+    border-radius: 0;
+}
+
+window#waybar {
+    background: transparent;
+    color: #cdd6f4;
+}
+
+.modules-left,
+.modules-center,
+.modules-right {
+    background: rgba(0, 0, 0, 0.88);
+    border: 1px solid rgba(180, 190, 254, 0.18);
+    border-radius: 18px;
+    padding: 4px 8px;
+}
+
+#workspaces {
+    padding: 0 3px;
+}
+
+#workspaces button {
+    color: #7f849c;
+    background: transparent;
+    border-radius: 12px;
+    padding: 0 10px;
+    margin: 2px;
+    transition: all 0.2s ease;
+}
+
+#workspaces button.active {
+    color: #1e1e2e;
+    background: #b4befe;
+}
+
+#workspaces button:hover {
+    color: #ffffff;
+    background: rgba(180, 190, 254, 0.22);
+}
+
+#clock {
+    color: #cdd6f4;
+    padding: 0 10px;
+}
+
+#network {
+    color: #89dceb;
+}
+
+#pulseaudio {
+    color: #cba6f7;
+}
+
+#battery {
+    color: #a6e3a1;
+}
+
+#battery.warning {
+    color: #f9e2af;
+}
+
+#battery.critical {
+    color: #f38ba8;
+}
+
+#tray {
+    padding: 0 5px;
+}
+
+#network,
+#pulseaudio,
+#battery,
+#mpris,
+#custom-asus,
+#custom-mangohud,
+#custom-maxperf,
+#cpu,
+#memory,
+#custom-temp,
+#custom-gpu,
+#custom-voxtype,
+#custom-kbd,
+#window,
+#bluetooth,
+#custom-screenshot,
+#custom-updates,
+#custom-sleep,
+#custom-weather,
+#custom-tailscale,
+#custom-idle,
+#custom-touchpad,
+#custom-notification,
+#custom-power {
+    padding: 0 8px;
+}
+
+tooltip {
+    background: rgba(0, 0, 0, 0.96);
+    border: 1px solid rgba(190, 200, 230, 0.2);
+    border-radius: 10px;
+    color: #e6e9ef;
+}
+
+#custom-notification {
+    color: #f9e2af;
+}
+
+#custom-mangohud.on {
+    color: #a6e3a1;
+}
+
+#custom-mangohud.off {
+    color: #6c7086;
+}
+
+#custom-notification.off {
+    color: #6c7086;
+}
+
+#custom-power {
+    color: #f38ba8;
+}
+
+#custom-screenshot {
+    color: #b4befe;
+}
+#custom-screenshot.recording { color: #f38ba8; }  /* red while recording */
+
+#mpris {
+    color: #f5c2e7;
+    margin-left: 8px;
+}
+
+#mpris.paused {
+    color: #6c7086;
+}
+
+#custom-asus.quiet       { color: #94e2d5; }
+#custom-asus.balanced    { color: #89b4fa; }
+#custom-asus.performance { color: #fab387; }
+
+#cpu         { color: #89b4fa; }
+#memory      { color: #cba6f7; }
+#custom-temp { color: #fab387; }
+#custom-temp.critical { color: #f38ba8; }
+
+#bluetooth   { color: #89b4fa; }
+#bluetooth.off,
+#bluetooth.disabled { color: #6c7086; }
+
+#custom-idle.on {
+    color: #a6adc8;
+}
+
+#custom-touchpad.on  { color: #a6adc8; }
+#custom-touchpad.dwt { color: #89b4fa; }
+#custom-touchpad.off { color: #f38ba8; }
+
+#custom-idle.off {
+    color: #f9e2af;
+}
+
+#custom-updates.none    { color: #6c7086; }
+#custom-updates.pending { color: #a6e3a1; }
+
+#custom-sleep.off { color: #6c7086; }
+#custom-sleep.on  { color: #cba6f7; }
+#custom-asus.game        { color: #f38ba8; }
+#custom-asus.turbo       { color: #f38ba8; font-weight: bold; }
+
+#custom-weather { color: #89dceb; }
+
+#custom-tailscale.on  { color: #a6e3a1; }
+#custom-tailscale.off { color: #6c7086; }
+
+#custom-maxperf.on  { color: #f38ba8; font-weight: bold; }
+#custom-maxperf.off { color: #6c7086; }
+
+#custom-gpu { color: #94e2d5; }
+#custom-voxtype { color: #a6e3a1; }
+#custom-voxtype.recording { color: #f38ba8; }
+#custom-voxtype.transcribing { color: #f9e2af; }
+#custom-voxtype.stopped { color: #6c7086; }
+#custom-gpu.critical { color: #f38ba8; }
+#window { color: #7f849c; font-weight: 500; }
+#custom-kbd.off { color: #6c7086; }
+#custom-kbd.low { color: #9399b2; }
+#custom-kbd.med { color: #f9e2af; }
+#custom-kbd.high { color: #fab387; }

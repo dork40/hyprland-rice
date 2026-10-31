@@ -1,0 +1,43 @@
+Super + /                  This cheat sheet
+Super + Enter              Terminal (kitty)
+Super + R                  App launcher
+Super + E                  File manager (Dolphin)
+Super + B                  Browser (Chrome)
+Super + C                  Close window
+Super + F                  Fullscreen
+Super + V                  Float / unfloat window
+Super + J                  Swap split direction
+Super + P                  Pseudo-tile window
+Super + Arrows             Focus window left/right/up/down
+Super + 1-0                Go to workspace 1-10
+Super + Shift + 1-0        Move window to workspace 1-10
+Super + Scroll             Next / previous workspace
+Super + Left drag          Move window
+Super + Right drag         Resize window
+Super + S                  Show / hide scratchpad
+Super + Shift + S          Send window to scratchpad
+Super + Tab                Window switcher
+Super + `                  Dropdown terminal
+Super + Escape             Power menu (screen off, logout, sleep, restart, shut down)
+Super + M                  Log out of Hyprland
+Print                      Screenshot an area
+Shift + Print              Screenshot the active window
+Ctrl + Print               Screenshot the whole screen
+Super + Shift + A          Screenshot an area
+Super + Shift + T          Copy text from the screen
+Super + Shift + C          Colour picker
+Super + Shift + V          Clipboard history
+Super + .                  Emoji picker
+Super + =                  Calculator
+Super + W                  Pick a wallpaper
+Super + Shift + R          Wardrobe: switch rice style
+Super + N                  Do not disturb on / off
+Super + F7 / F8            Screen brightness down / up
+Fn keyboard light keys     Keyboard backlight
+Fn + F5 (fan key)          Cycle Quiet / Balanced / Performance
+Armoury Crate key          ROG Control Center
+Left Shift + F12           Show / hide MangoHud in games
+3-finger swipe             Switch workspace
+Waybar speedometer         Left: change profile · Right: game mode
+Waybar screen timer        Left: on / off · Right: change minutes
+Waybar battery             Charge to 100% once

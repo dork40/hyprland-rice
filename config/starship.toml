@@ -1,0 +1,47 @@
+# Catppuccin Mocha accents on black
+"$schema" = 'https://starship.rs/config-schema.json'
+
+add_newline = false
+format = "${custom.dir}$git_branch$git_status$python$nodejs$rust$golang$character"
+
+[directory]
+disabled = true
+style = "bold fg:#cba6f7"
+truncation_length = 3
+truncation_symbol = "…/"
+
+[git_branch]
+symbol = " "
+style = "fg:#89b4fa"
+format = "[on $symbol$branch]($style) "
+
+[git_status]
+style = "fg:#f38ba8"
+
+[python]
+symbol = " "
+style = "fg:#f9e2af"
+
+[nodejs]
+symbol = " "
+style = "fg:#a6e3a1"
+
+[rust]
+symbol = " "
+style = "fg:#fab387"
+
+[golang]
+symbol = " "
+style = "fg:#89dceb"
+
+[character]
+success_symbol = "[❯](bold fg:#cba6f7)"
+error_symbol = "[❯](bold fg:#f38ba8)"
+
+# Directory, hidden in the home folder
+[custom.dir]
+when = '[ "$PWD" != "$HOME" ]'
+command = 'p="${PWD/#$HOME/\~}"; IFS=/ read -ra a <<< "$p"; n=${#a[@]}; if [ $n -gt 4 ]; then echo "…/${a[n-3]}/${a[n-2]}/${a[n-1]}"; else echo "$p"; fi'
+shell = ["bash", "--noprofile", "--norc"]
+style = "bold fg:#cba6f7"
+format = "[$output]($style) "

@@ -1,0 +1,8 @@
+width=420
+height=60%
+location=center
+allow_images=true
+image_size=24
+lines=14
+insensitive=true
+matching=contains
