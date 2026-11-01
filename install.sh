@@ -157,7 +157,7 @@ fi
 # Fedora: which Hyprland COPR has packages for this Fedora version? (COPRs drop old Fedora versions, so try a few)
 COPR=""; FEDORA_VER=""
 pick_copr() {
-    FEDORA_VER=$(. /etc/os-release; echo "${VERSION_ID:-$(rpm -E %fedora 2>/dev/null)}")
+    FEDORA_VER=${RICE_FEDORA_VER:-$(. /etc/os-release; echo "${VERSION_ID:-$(rpm -E %fedora 2>/dev/null)}")}
     local c o p
     for c in solopasha/hyprland pm4rcin/Hyprland; do
         o=${c%/*}; p=${c#*/}
@@ -241,9 +241,26 @@ fix_xwayland() {
     local cur; cur=$(rpm -qa 2>/dev/null | grep -i 'xorg-x11-server-Xwayland' | grep -vi '^xorg-x11-server-Xwayland-[0-9]' | head -1)
     [[ -z $cur ]] && return 1
     cur=${cur%%-[0-9]*}
-    if [[ $cur == terra-* ]]; then   # Bazzite: tried repeatedly, rpm-ostree cannot swap this one (see offer_wayblue at the end)
+    if [[ $cur == terra-* ]]; then
+        local url; url=$(terra_xwayland_rpm 2>/dev/null) || url=""
+        if [[ -z $url ]]; then
+            XWL_MODE=blocked
+            HYPR_ERR="Bazzite's own Xwayland ($cur) lacks a name Hyprland's package needs, and I could not find Terra's previous build to switch to."
+            return 1
+        fi
+        echo "  Bazzite's Xwayland ($cur) is a newer build that doesn't advertise a name Hyprland's package asks for."
+        echo "  I will switch it to Terra's previous build of the SAME package (from the same repo). Nothing else changes."
+        echo "  It takes effect at the next reboot. If anything looks wrong afterwards: rpm-ostree rollback"
+        local ans=y
+        if [[ -r /dev/tty ]]; then read -r -p "  Continue? [Y/n] " ans </dev/tty || ans=y; fi
+        [[ $ans =~ ^[Nn] ]] && return 1
+        rpmostree_wait
+        if sudo rpm-ostree override replace "$url" --install hyprland --install xdg-desktop-portal-hyprland; then XWL_MODE=combined; return 0; fi
+        echo "  Doing it in two steps instead (Hyprland installs on the next run, after a reboot)..."
+        rpmostree_wait
+        if sudo rpm-ostree override replace "$url"; then XWL_MODE=swap; return 0; fi
         XWL_MODE=blocked
-        HYPR_ERR="Bazzite's own Xwayland ($cur) conflicts with the Xwayland that Hyprland's package needs, and rpm-ostree cannot swap it."
+        HYPR_ERR="Switching Terra's Xwayland to its previous build failed (see the error above)."
         return 1
     fi
     echo "  This system ships its own Xwayland ($cur), which blocks Hyprland's package."
@@ -255,6 +272,33 @@ fix_xwayland() {
     [[ $ans =~ ^[Nn] ]] && return 1
     if clean_slate_swap "$cur"; then XWL_MODE=combined; return 0; fi
     return 1
+}
+# Bazzite's Xwayland comes from the Terra repo. Its newest build does not advertise the name "xorg-x11-server-Xwayland(x86-64)" that
+# Hyprland's package requires, but Terra's previous build does. Find that build's download URL (same package, same repo).
+terra_xwayland_rpm() {
+    local base="https://repos.fyralabs.com/terra${FEDORA_VER}-extras" prim
+    prim=$(curl -fsSL --max-time 30 "$base/repodata/repomd.xml" 2>/dev/null | sed -n 's/.*href="\(repodata\/[^"]*primary.xml.zst\)".*/\1/p' | head -1)
+    [[ -n $prim ]] || return 1
+    curl -fsSL --max-time 120 "$base/$prim" 2>/dev/null | python3 -c '
+import re, subprocess, sys
+raw = sys.stdin.buffer.read()
+try:
+    from compression import zstd
+    x = zstd.decompress(raw).decode()
+except Exception:
+    x = subprocess.run(["zstd", "-dc"], input=raw, capture_output=True).stdout.decode()
+base = sys.argv[1]
+best = None
+for m in re.finditer(r"<package type=\"rpm\">.*?</package>", x, re.S):
+    b = m.group(0)
+    if "<name>terra-xorg-x11-server-Xwayland</name>" not in b or "<arch>x86_64</arch>" not in b: continue
+    if not re.search(r"<rpm:entry name=.xorg-x11-server-Xwayland[(]x86-64[)]", b): continue   # only builds that advertise the exact name Hyprland needs
+    v = re.search(r"ver=\"([^\"]+)\"", b).group(1)
+    key = tuple(int(n) if n.isdigit() else 0 for n in re.split(r"[.]", v))
+    loc = re.search(r"<location href=\"([^\"]+)\"", b).group(1)
+    if best is None or key > best[0]: best = (key, loc)
+if best: print(base + "/" + best[1])
+' "$base"
 }
 # rpm-ostree runs one job at a time. If one is already running (maybe an earlier run of this installer), offer to cancel it.
 rpmostree_wait() {
@@ -282,7 +326,16 @@ atomic_install() {
         nf=$(sed -n 's/.*Packages not found: //p' "$tmp" | head -1)
         if [[ -z $nf ]]; then
             if { grep -qi 'xwayland' "$tmp" || { printf '%s\n' "${list[@]}" | grep -qx hyprland && rpm -qa 2>/dev/null | grep -qi '^terra-xorg-x11-server-Xwayland'; }; } && fix_xwayland; then
-                XWL_PENDING=1; rm -f "$tmp"; return 0   # everything, Hyprland included, is queued together for the next boot
+                XWL_PENDING=1
+                keep=()   # Hyprland is either queued together with the swap (combined) or waits for the reboot (swap); install the rest now
+                for p in "${list[@]}"; do
+                    case $p in
+                        hyprland|xdg-desktop-portal-hyprland) [[ $XWL_MODE == combined ]] || DEFERRED+=("$p") ;;
+                        *) keep+=("$p") ;;
+                    esac
+                done
+                list=("${keep[@]}"); ((${#list[@]})) || { rm -f "$tmp"; return 0; }
+                continue
             fi
             if [[ $XWL_MODE == blocked ]]; then
                 keep=(); for p in "${list[@]}"; do [[ $p == hyprland || $p == xdg-desktop-portal-hyprland ]] && continue; keep+=("$p"); done
