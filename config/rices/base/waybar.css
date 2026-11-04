@@ -130,7 +130,18 @@ tooltip {
 #custom-screenshot {
     color: #b4befe;
 }
-#custom-screenshot.recording { color: #f38ba8; }  /* red while recording */
+#custom-screenshot.recording {   /* unmissable while recording: solid red pill that pulses */
+    background: #f38ba8;
+    color: #11111b;
+    font-weight: bold;
+    padding: 0 12px;
+    border-radius: 12px;
+    animation: rec-pulse 1s ease-in-out infinite alternate;
+}
+@keyframes rec-pulse {
+    from { background-color: #f38ba8; }
+    to   { background-color: #7a2a3c; color: #f38ba8; }
+}
 
 #mpris {
     color: #f5c2e7;

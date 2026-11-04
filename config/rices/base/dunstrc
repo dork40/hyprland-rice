@@ -34,3 +34,6 @@
     foreground = "#cdd6f4"
     frame_color = "#fab387"
     timeout = 0
+
+[sound]
+    script = @HOME@/.config/hypr/scripts/notif-sound.sh

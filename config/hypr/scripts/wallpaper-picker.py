@@ -21,6 +21,8 @@ CURRENT = os.path.expanduser("~/.cache/current-wallpaper")
 EXTS = (".png", ".jpg", ".jpeg", ".webp", ".gif")
 THUMB_W, THUMB_H = 400, 250
 
+sys.path.insert(0, os.path.expanduser('~/.config/rices'))
+import popup_anim  # noqa: E402
 CSS = b"""
 window { background: rgba(0, 0, 0, 0.7); }
 .panel {
@@ -81,11 +83,18 @@ def set_wallpaper(path):
     os.symlink(path, CURRENT)
     with open(os.path.expanduser(f"~/.cache/wardrobe-wall-{RICE}"), "w") as f:  # remembered per rice
         f.write(path)
+    if RICE == "aurora":  # colours follow the wallpaper
+        subprocess.Popen(["python3", os.path.expanduser("~/.config/rices/wardrobe.py"), "retheme"], start_new_session=True)
 
 
 class Picker(Gtk.Application):
     def __init__(self):
         super().__init__(application_id="dev.rice.WallpaperPicker")
+
+    def close_anim(self):
+        if self._closing: return
+        self._closing = True
+        popup_anim.animate_out(self._win, self._panel, self.quit)
 
     def do_activate(self):
         win = Gtk.ApplicationWindow(application=self)
@@ -136,9 +145,10 @@ class Picker(Gtk.Application):
         panel.append(header)
         panel.append(scroll)
         win.set_child(panel)
+        self._win, self._panel, self._closing = win, panel, False
 
         keys = Gtk.EventControllerKey()
-        keys.connect("key-pressed", lambda _c, key, _code, _state: key == Gdk.KEY_Escape and (self.quit() or True))
+        keys.connect("key-pressed", lambda _c, key, _code, _state: key == Gdk.KEY_Escape and (self.close_anim() or True))
         win.add_controller(keys)
 
         # a click on the dimmed area outside the panel closes the picker
@@ -147,11 +157,12 @@ class Picker(Gtk.Application):
             ok, rect = panel.compute_bounds(win)
             if ok and not (rect.origin.x <= x <= rect.origin.x + rect.size.width
                            and rect.origin.y <= y <= rect.origin.y + rect.size.height):
-                self.quit()
+                self.close_anim()
         click.connect("pressed", outside)
         win.add_controller(click)
 
         win.present()
+        popup_anim.animate_in(win, panel)
         first = select_me or grid.get_child_at_index(0)
         if first:
             grid.select_child(first)
@@ -159,7 +170,7 @@ class Picker(Gtk.Application):
 
     def on_pick(self, _grid, child, _win):
         set_wallpaper(child.path)
-        self.quit()
+        self.close_anim()
 
 
 if __name__ == "__main__":

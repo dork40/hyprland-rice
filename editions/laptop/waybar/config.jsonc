@@ -139,14 +139,15 @@
     "format-connected": "󰂱 {num_connections}",
     "tooltip-format-connected": "{device_enumerate}",
     "tooltip-format-enumerate-connected": "{device_alias}",
-    "on-click": "blueman-manager"
+    "on-click": "blueman-manager",
+    "on-click-right": "sh -c 'if bluetoothctl show | grep -q \"Powered: yes\"; then bluetoothctl power off; else bluetoothctl power on; fi'"
   },
   "custom/screenshot": {
     "exec": "~/.config/hypr/scripts/record.sh",
     "return-type": "json",
     "interval": "once",
     "signal": 15,
-    "on-click": "~/.config/hypr/scripts/screenshot.sh region",
+    "on-click": "~/.config/hypr/scripts/record.sh click",
     "on-click-right": "~/.config/hypr/scripts/record.sh toggle"
   },
   "custom/idle": {

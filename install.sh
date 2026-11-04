@@ -119,6 +119,7 @@ ATOMIC=0
 case $DISTRO in
 arch)
     PKGS=(hyprland waybar wofi dunst kitty swayosd hypridle hyprpaper wlogout starship ttf-jetbrains-mono-nerd
+          matugen swappy libcanberra sound-theme-freedesktop plocate
           python python-gobject gtk4 gtk4-layer-shell ffmpeg curl libnotify xdg-desktop-portal-hyprland thunar sddm
           cliphist wl-clipboard grim slurp hyprpicker wf-recorder playerctl tesseract tesseract-data-eng btop udiskie
           network-manager-applet blueman polkit-kde-agent pavucontrol papirus-icon-theme breeze awww rofimoji)

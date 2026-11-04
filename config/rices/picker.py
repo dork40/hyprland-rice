@@ -10,6 +10,7 @@ import wardrobe  # noqa: E402
 
 THUMBS = os.path.expanduser("~/.cache/wallpaper-thumbs")
 TW, TH = 380, 240
+import popup_anim  # noqa: E402
 CSS = b"""
 window { background: rgba(0, 0, 0, 0.7); }
 .panel { background: #000; border: 2px solid rgba(203,166,247,0.45); border-radius: 22px; padding: 22px 26px 26px 26px; }
@@ -36,6 +37,11 @@ class Picker(Gtk.Application):
     def __init__(self):
         super().__init__(application_id="dev.rice.WardrobePicker")
 
+    def close_anim(self):
+        if self._closing: return
+        self._closing = True
+        popup_anim.animate_out(self._win, self._panel, self.quit)
+
     def do_activate(self):
         win = Gtk.ApplicationWindow(application=self)
         LayerShell.init_for_window(win)
@@ -49,7 +55,7 @@ class Picker(Gtk.Application):
 
         grid = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.SINGLE, homogeneous=True, min_children_per_line=3,
                            max_children_per_line=3, row_spacing=14, column_spacing=14, activate_on_single_click=True)
-        grid.connect("child-activated", lambda _g, c: (wardrobe.apply(c.rice), self.quit()))
+        grid.connect("child-activated", lambda _g, c: (wardrobe.apply(c.rice), self.close_anim()))
         cur = wardrobe.current(); sel = None
         for name in wardrobe.ORDER:
             r = wardrobe.RICES[name]
@@ -69,17 +75,19 @@ class Picker(Gtk.Application):
         panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, css_classes=["panel"], halign=Gtk.Align.CENTER, valign=Gtk.Align.CENTER)
         panel.append(header); panel.append(grid)
         win.set_child(panel)
+        self._win, self._panel, self._closing = win, panel, False
 
         keys = Gtk.EventControllerKey()
-        keys.connect("key-pressed", lambda _c, k, _cd, _s: k == Gdk.KEY_Escape and (self.quit() or True))
+        keys.connect("key-pressed", lambda _c, k, _cd, _s: k == Gdk.KEY_Escape and (self.close_anim() or True))
         win.add_controller(keys)
         click = Gtk.GestureClick()
         def outside(_g, _n, x, y):
             ok, b = panel.compute_bounds(win)
             if ok and not (b.origin.x <= x <= b.origin.x + b.size.width and b.origin.y <= y <= b.origin.y + b.size.height):
-                self.quit()
+                self.close_anim()
         click.connect("pressed", outside); win.add_controller(click)
         win.present()
+        popup_anim.animate_in(win, panel)
         first = sel or grid.get_child_at_index(0)
         grid.select_child(first); first.grab_focus()
 

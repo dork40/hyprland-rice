@@ -42,6 +42,7 @@ hl.on("hyprland.start", function ()
   hl.exec_cmd("sh -c 'while :; do waybar; sleep 1; done'")  -- restarts the bar if it ever crashes
   hl.exec_cmd("~/.config/hypr/scripts/wallpaper-restore.sh")
   hl.exec_cmd("swayosd-server")
+  hl.exec_cmd("sh -c 'LD_PRELOAD=/usr/lib/libgtk4-layer-shell.so exec python3 ~/.config/hypr/scripts/quick-settings.py --hidden'")  -- quick settings, resident and hidden
   hl.exec_cmd("hypridle -c ~/.config/hypr/hypridle-sleeponly.conf")  -- screen timeout starts OFF; turn it on with the Waybar button
   hl.exec_cmd("sh -c 'dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE; systemctl --user reset-failed xdg-desktop-portal-hyprland; systemctl --user restart xdg-desktop-portal-hyprland xdg-desktop-portal'")  -- screen sharing/OBS: the portal can crash if it starts before Hyprland after a re-login
   hl.exec_cmd("dunst")
@@ -278,10 +279,13 @@ hl.bind("Print",                   hl.dsp.exec_cmd("~/.config/hypr/scripts/scree
 hl.bind("SHIFT + Print",           hl.dsp.exec_cmd("~/.config/hypr/scripts/screenshot.sh window"))
 hl.bind("CTRL + Print",            hl.dsp.exec_cmd("~/.config/hypr/scripts/screenshot.sh screen"))
 hl.bind(mainMod .. " + SHIFT + A", hl.dsp.exec_cmd("~/.config/hypr/scripts/screenshot.sh region"))
+hl.bind(mainMod .. " + CTRL + A",  hl.dsp.exec_cmd("~/.config/hypr/scripts/screenshot.sh annotate"))
+hl.bind("ALT + Print",             hl.dsp.exec_cmd("~/.config/hypr/scripts/screenshot.sh annotate"))
 
 -- Clipboard history, notification toggle, power menu
 hl.bind(mainMod .. " + SHIFT + V", hl.dsp.exec_cmd("~/.config/hypr/scripts/clipboard.sh"))
 hl.bind(mainMod .. " + N",         hl.dsp.exec_cmd("~/.config/hypr/scripts/notif-toggle.sh"))
+hl.bind(mainMod .. " + G",         hl.dsp.exec_cmd("~/.config/hypr/scripts/quick-settings.sh"))
 -- hl.bind(mainMod .. " + Escape",    hl.dsp.exec_cmd("wlogout -b 6 -T 400 -B 400"))  -- removed: Fn brightness keys were opening it; use the Waybar power button
 
 -- Move focus with mainMod + arrow keys
@@ -346,6 +350,7 @@ hl.bind(mainMod .. " + Tab", hl.dsp.exec_cmd("~/.config/hypr/scripts/windows.sh"
 hl.bind(mainMod .. " + period",        hl.dsp.exec_cmd("rofimoji --selector wofi --action copy"))
 hl.bind(mainMod .. " + SHIFT + C",     hl.dsp.exec_cmd("~/.config/hypr/scripts/colorpick.sh"))
 hl.bind(mainMod .. " + equal",         hl.dsp.exec_cmd("~/.config/hypr/scripts/calc.sh"))
+hl.bind(mainMod .. " + SHIFT + F",    hl.dsp.exec_cmd("~/.config/hypr/scripts/files.sh"))
 hl.bind(mainMod .. " + grave",         hl.dsp.exec_cmd("~/.config/hypr/scripts/dropdown.sh"))
 hl.bind(mainMod .. " + SHIFT + T",     hl.dsp.exec_cmd("~/.config/hypr/scripts/ocr.sh"))  -- copy text from the screen
 hl.bind(mainMod .. " + slash",         hl.dsp.exec_cmd("~/.config/hypr/scripts/keybinds.sh"))  -- shortcut cheat sheet
