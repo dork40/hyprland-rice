@@ -20,7 +20,19 @@ button {
     background-position: center;
     background-size: 30%;
     transition: all 0.2s ease;
+    animation: wl-in 320ms ease-out both;     /* buttons rise and fade in, staggered below */
 }
+
+@keyframes wl-in {
+    from { opacity: 0; margin-top: 46px; margin-bottom: -26px; }
+    to   { opacity: 1; margin-top: 10px; margin-bottom: 10px; }
+}
+#lock, #screenoff   { animation-delay: 0ms; }
+#logout             { animation-delay: 40ms; }
+#suspend            { animation-delay: 80ms; }
+#hibernate          { animation-delay: 120ms; }
+#reboot             { animation-delay: 160ms; }
+#shutdown           { animation-delay: 200ms; }
 
 button:focus,
 button:hover {
