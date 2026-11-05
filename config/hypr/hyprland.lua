@@ -271,7 +271,7 @@ hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + B",         hl.dsp.exec_cmd("xdg-open https://duckduckgo.com"))  -- opens your default browser
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
 hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit"))    -- dwindle only
-hl.bind(mainMod .. " + R", hl.dsp.exec_cmd("wofi --show drun"))
+hl.bind(mainMod .. " + R", hl.dsp.exec_cmd("~/.config/hypr/scripts/launcher.py"))
 hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen())
 
 -- Screenshots (saved to ~/Pictures/Screenshots and copied to clipboard)
