@@ -2,7 +2,7 @@
 # Area screen recording with wf-recorder, for the Waybar camera button.
 #   (no arg)  print waybar JSON (camera icon, red while recording)
 #   toggle    stop the current recording, or open the menu (region / window / full screen / audio / GIF)
-#   start M S start straight away: M = region|window|screen|gif, S = none|mic|system|both
+#   start M S [Q] start straight away: M = region|window|screen|gif, S = none|mic|system|both, Q = native60|nativemax|hevc60|1440p|1080p|720p
 dir=~/Videos/Recordings
 pidf=${XDG_RUNTIME_DIR:-/tmp}/record.pid
 startf=${XDG_RUNTIME_DIR:-/tmp}/record.start
@@ -46,6 +46,25 @@ boost_audio() {
     ffmpeg -loglevel error -y -i "$f" -c:v copy -af "volume=${gain}dB,alimiter=limit=0.95" -c:a aac -b:a 128k "$tmp" && mv "$tmp" "$f"
 }
 
+# encoder QUALITY: fills the enc array. QUALITY: native60 (default) | nativemax | hevc60 | 1440p | 1080p | 720p
+# Uses the GPU's hardware encoder (low CPU, good for games) at native resolution; scaled options keep the aspect ratio and never upscale.
+# Falls back to software x264 if the GPU has no VA-API encoder. RECORD_VAAPI_DEVICE overrides the device.
+encoder() {
+    local q=${1:-native60} h= codec=h264 fps=60 dev=${RECORD_VAAPI_DEVICE:-/dev/dri/renderD128} info=
+    case $q in nativemax) fps=0 ;; hevc60) codec=hevc ;; 1440p) h=1440 ;; 1080p) h=1080 ;; 720p) h=720 ;; esac
+    enc=()
+    [ -e "$dev" ] && info=$(vainfo --display drm --device "$dev" 2>/dev/null)
+    if grep -qi "VAProfileH264.*EncSlice" <<<"$info"; then
+        if [ $codec = hevc ] && ! grep -qi "VAProfileHEVC.*EncSlice" <<<"$info"; then codec=h264; fi
+        if [ $codec = hevc ]; then enc+=(-c hevc_vaapi -d "$dev" -p qp=20); else enc+=(-c h264_vaapi -d "$dev" -p qp=18); fi
+        [ -n "$h" ] && enc+=(-F "scale_vaapi=w=-2:h='min(ih,$h)':format=nv12:out_range=full")
+    else
+        enc+=(-c libx264 -x yuv420p -p preset=veryfast -p crf=18)
+        [ -n "$h" ] && enc+=(-F "scale=-2:'min(ih,$h)'")
+    fi
+    [ "$fps" != 0 ] && enc+=(-r "$fps")
+}
+
 case "$1" in
   click)   # left click: stop if recording, otherwise screenshot an area
     if recording; then kill -INT "$(cat "$pidf")"; else exec ~/.config/hypr/scripts/screenshot.sh region; fi
@@ -81,12 +100,24 @@ case "$1" in
           *)                      sound=none ;;
         esac
     fi
-    exec "$0" start "$mode" "$sound" ;;
+    qual=native60
+    if [ "$mode" != gif ] && [ ! -e "$discordf" ]; then
+        q=$(printf '%s\n' "Native · 60 fps (best for gaming)" "Native · max fps (up to 165, big files)" "Native · 60 fps · HEVC (smaller files)" "1440p · 60 fps" "1080p · 60 fps" "720p · 60 fps" |
+            wofi --dmenu --prompt "Quality" --lines 6 --insensitive) || exit 0
+        case $q in
+          "Native · max"*) qual=nativemax ;;
+          *HEVC*)          qual=hevc60 ;;
+          1440p*)          qual=1440p ;;
+          1080p*)          qual=1080p ;;
+          720p*)           qual=720p ;;
+        esac
+    fi
+    exec "$0" start "$mode" "$sound" "$qual" ;;
 
-  start)   # start MODE SOUND: region|window|screen|gif, sound none|mic|system|both (used by the menu above)
+  start)   # start MODE SOUND [QUALITY]: region|window|screen|gif, sound none|mic|system|both, quality see encoder() (used by the menu above)
     command -v wf-recorder >/dev/null || { notify-send "Screen recording" "wf-recorder isn't installed: sudo pacman -S wf-recorder"; exit 1; }
     recording && exit 0
-    mode=$2 sound=${3:-none}
+    mode=$2 sound=${3:-none} qual=${4:-native60}
     case $sound in 0) sound=none ;; 1) sound=system ;; esac
     discord=0; [ -e "$discordf" ] && discord=1
     args=()
@@ -110,6 +141,7 @@ case "$1" in
         mixmods="$mixmods $(pactl load-module module-loopback source="$(pactl get-default-sink).monitor" sink=rec_mix latency_msec=30)"
         args+=(--audio=rec_mix.monitor) ;;
     esac
+    if [ "$mode" != gif ]; then encoder "$qual"; args+=("${enc[@]}"); fi
     mkdir -p "$dir"
     stamp=$(date +%Y-%m-%d_%I-%M-%S%p)
     file="$dir/$stamp.mp4"
