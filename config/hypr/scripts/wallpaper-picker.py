@@ -22,7 +22,7 @@ EXTS = (".png", ".jpg", ".jpeg", ".webp", ".gif")
 THUMB_W, THUMB_H = 400, 250
 
 sys.path.insert(0, os.path.expanduser('~/.config/rices'))
-import popup_anim  # noqa: E402
+import popup_anim, theme  # noqa: E402
 CSS = b"""
 window { background: rgba(0, 0, 0, 0.7); }
 .panel {
@@ -106,7 +106,7 @@ class Picker(Gtk.Application):
             LayerShell.set_anchor(win, edge, True)
 
         css = Gtk.CssProvider()
-        css.load_from_data(CSS)
+        css.load_from_data(theme.css(CSS))
         Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), css, Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
         current = os.path.realpath(CURRENT) if os.path.exists(CURRENT) else ""

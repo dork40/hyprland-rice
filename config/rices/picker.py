@@ -10,7 +10,7 @@ import wardrobe  # noqa: E402
 
 THUMBS = os.path.expanduser("~/.cache/wallpaper-thumbs")
 TW, TH = 380, 240
-import popup_anim  # noqa: E402
+import popup_anim, theme  # noqa: E402
 CSS = b"""
 window { background: rgba(0, 0, 0, 0.7); }
 .panel { background: #000; border: 2px solid rgba(203,166,247,0.45); border-radius: 22px; padding: 22px 26px 26px 26px; }
@@ -50,7 +50,7 @@ class Picker(Gtk.Application):
         LayerShell.set_keyboard_mode(win, LayerShell.KeyboardMode.EXCLUSIVE)
         for e in (LayerShell.Edge.TOP, LayerShell.Edge.BOTTOM, LayerShell.Edge.LEFT, LayerShell.Edge.RIGHT):
             LayerShell.set_anchor(win, e, True)
-        css = Gtk.CssProvider(); css.load_from_data(CSS)
+        css = Gtk.CssProvider(); css.load_from_data(theme.css(CSS))
         Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), css, Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
         grid = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.SINGLE, homogeneous=True, min_children_per_line=3,

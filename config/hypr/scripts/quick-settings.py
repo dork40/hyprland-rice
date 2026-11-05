@@ -3,6 +3,8 @@
 import json, os, signal, subprocess, re, sys, threading
 from concurrent.futures import ThreadPoolExecutor
 import gi
+sys.path.insert(0, os.path.expanduser('~/.config/rices'))
+import theme
 gi.require_version("Gtk", "4.0"); gi.require_version("Gdk", "4.0"); gi.require_version("Gtk4LayerShell", "1.0")
 from gi.repository import Gdk, GLib, Gtk, Gtk4LayerShell as LayerShell  # noqa: E402
 
@@ -90,7 +92,7 @@ class App(Gtk.Application):
     def do_activate(self):
         if getattr(self, "started", False): return
         self.started = True
-        css = Gtk.CssProvider(); css.load_from_data(CSS)
+        css = Gtk.CssProvider(); css.load_from_data(theme.css(CSS))
         Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), css, Gtk.STYLE_PROVIDER_PRIORITY_USER)
         self.hold()   # stay resident (no Python/GTK startup cost); SIGUSR1 toggles the panel
         GLib.unix_signal_add(GLib.PRIORITY_HIGH, signal.SIGUSR1, self.toggle)
