@@ -53,15 +53,18 @@ class Picker(Gtk.Application):
         css = Gtk.CssProvider(); css.load_from_data(theme.css(CSS))
         Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), css, Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
-        grid = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.SINGLE, homogeneous=True, min_children_per_line=3,
-                           max_children_per_line=3, row_spacing=14, column_spacing=14, activate_on_single_click=True)
+        n = len(wardrobe.ORDER)
+        cols = max(1, min(3, n))                       # as many columns as there are rices, so no empty slot is left over
+        tw, th = (TW, TH) if n > 3 else (560, 350)     # with only a few rices, make the cards bigger to fill the panel
+        grid = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.SINGLE, homogeneous=True, min_children_per_line=cols,
+                           max_children_per_line=cols, row_spacing=14, column_spacing=14, activate_on_single_click=True)
         grid.connect("child-activated", lambda _g, c: (wardrobe.apply(c.rice), self.close_anim()))
         cur = wardrobe.current(); sel = None
         for name in wardrobe.ORDER:
             r = wardrobe.RICES[name]
             card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, css_classes=["card"])
             pic = Gtk.Picture.new_for_filename(thumb(os.path.expanduser(r["wall"])))
-            pic.set_content_fit(Gtk.ContentFit.COVER); pic.set_size_request(TW, TH)
+            pic.set_content_fit(Gtk.ContentFit.COVER); pic.set_size_request(tw, th)
             card.append(pic)
             card.append(Gtk.Label(label=name, css_classes=["name"], xalign=0))
             card.append(Gtk.Label(label=r["desc"], css_classes=["desc"], xalign=0, wrap=True, max_width_chars=44))

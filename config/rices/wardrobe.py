@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Wardrobe: switch between whole-desktop rice styles.  wardrobe.py [pick|next|apply NAME|list|current]"""
-import os, re, subprocess, sys, pathlib
+import os, re, shutil, subprocess, sys, pathlib
 
 H = pathlib.Path.home()
 C = H / ".config"
@@ -43,14 +43,12 @@ RICES["aurora"] = dict(wall="~/Pictures/wallpapers/aurora/earth-limb.jpg", dynam
     desc="Colours pulled from the wallpaper (matugen) on a black base",
     pal=pal(), border=("cba6f7", "f5c2e7", "89b4fa"), accent="b4befe", inactive="313244",
     rounding=9, gaps_in=2, gaps_out=6, border_size=2, blur=(8, 3), bar_r=11, bar_a=0.6, anim="smooth", kitty_a=0.4, radius=0.8)
-RICES["ml4w"] = dict(wall="~/Pictures/wallpapers/aurora/earth-limb.jpg",
-    desc="ML4W look: teal Material You colours, soft gradient border, roomy gaps",
-    pal=pal(mauve="81d5cd", lavender="81d5cd", blue="b0ccc8", sky="b0ccc8", teal="afc9e7", pink="afc9e7", rosewater="9df2e9",
-            text="dde4e2", sub1="bec9c6", sub0="bec9c6", ov2="899391", ov1="899391", ov0="3f4947",
-            s2="2f3736", s1="232b2a", mantle="0a0f0e", crust="000000", base="0e1514"),
-    border=("81d5cd", "003734"), accent="81d5cd", inactive="3f4947", angle=90,
-    rounding=10, gaps_in=10, gaps_out=16, border_size=2, blur=(4, 4), bar_r=16, bar_a=0.8, anim="ml4w", kitty_a=0.85, radius=1.0)
-ORDER = list(RICES)
+def _hidden():
+    """Rices you deleted: listed in ~/.config/rices/hidden-rices, one name per line. They stay in the code but are not offered."""
+    try: return set((R / "hidden-rices").read_text().split())
+    except OSError: return set()
+
+ORDER = [n for n in RICES if n not in _hidden()]
 
 def dynamic_rice(r, wp):
     """Derive the palette, borders and accent from the wallpaper with matugen."""
@@ -107,18 +105,6 @@ hl.animation({ leaf = "windows",     enabled = true, speed = 5, spring = "glide"
 hl.animation({ leaf = "windowsMove", enabled = true, speed = 5, spring = "glide" })
 hl.animation({ leaf = "windowsIn",   enabled = true, speed = 5, bezier = "overshot",  style = "popin 60%" })
 hl.animation({ leaf = "workspaces",  enabled = true, speed = 5, bezier = "easeOutQuint", style = "slide" })''',
-        "ml4w": '''hl.config({ animations = { enabled = true } })
-hl.curve("md3_decel", { type = "bezier", points = { {0.05, 0.7}, {0.1, 1} } })
-hl.curve("md3_accel", { type = "bezier", points = { {0.3, 0}, {0.8, 0.15} } })
-hl.curve("menu_decel", { type = "bezier", points = { {0.1, 1}, {0, 1} } })
-hl.curve("menu_accel", { type = "bezier", points = { {0.38, 0.04}, {1, 0.07} } })
-hl.animation({ leaf = "windows",     enabled = true, speed = 3, bezier = "md3_decel", style = "popin 60%" })
-hl.animation({ leaf = "windowsIn",   enabled = true, speed = 3, bezier = "md3_decel", style = "popin 60%" })
-hl.animation({ leaf = "windowsOut",  enabled = true, speed = 3, bezier = "md3_accel", style = "popin 60%" })
-hl.animation({ leaf = "fade",        enabled = true, speed = 3, bezier = "md3_decel" })
-hl.animation({ leaf = "layersIn",    enabled = true, speed = 3, bezier = "menu_decel", style = "slide" })
-hl.animation({ leaf = "layersOut",   enabled = true, speed = 1.6, bezier = "menu_accel" })
-hl.animation({ leaf = "workspaces",  enabled = true, speed = 7, bezier = "menu_decel", style = "slide" })''',
         "smooth": '''hl.config({ animations = { enabled = true } })
 hl.animation({ leaf = "windows",     enabled = true, speed = 4, bezier = "easeOutQuint", style = "popin 90%" })
 hl.animation({ leaf = "windowsIn",   enabled = true, speed = 4, bezier = "easeOutQuint", style = "popin 90%" })
@@ -136,7 +122,7 @@ hl.config({{
     general = {{
         gaps_in = {r["gaps_in"]}, gaps_out = {r["gaps_out"]}, border_size = {r["border_size"]},
         col = {{
-            active_border   = {{ colors = {{ {b} }}, angle = {r.get('angle', 45)} }},
+            active_border   = {{ colors = {{ {b} }}, angle = 45 }},
             inactive_border = "{rgba(r["inactive"], "88")}",
         }},
     }},
@@ -194,6 +180,16 @@ def bar_overlay(r):
 #workspaces button {{ border-radius: {max(r["bar_r"] - 6, 0)}px; }}
 {r.get("css", "")}"""
 
+def ensure_bar(tries=4):
+    """After a reload the bar can start before the monitors are settled and never get drawn: keep checking that it is
+    really on screen, and restart it (its restart loop brings it back) until it is."""
+    import time
+    for _ in range(tries):
+        time.sleep(2.5)
+        if "waybar" in subprocess.run("hyprctl layers", shell=True, capture_output=True, text=True).stdout: return True
+        subprocess.run("pkill -x waybar", shell=True)
+    return False
+
 def pick_wall(name):
     wp = os.path.expanduser(RICES[name]["wall"])
     try:  # the wallpaper last picked with Super+W for this rice wins over its default
@@ -202,7 +198,20 @@ def pick_wall(name):
     except OSError: pass
     return wp
 
+LASTF = R / "last-normal"
+
+def last_normal():
+    try: return LASTF.read_text().strip() or "noir"
+    except OSError: return "noir"
+
 def apply(name, set_wall=True):
+    cur = current()
+    if cur in RICES and RICES[cur].get("full") and cur != name:
+        leave_full(cur)   # also when going from one full rice straight to another
+        STATE.write_text(last_normal() + "\n")
+    if RICES[name].get("full"):
+        if current() != name: enter_full(name)
+        return
     wp = pick_wall(name)
     r = RICES[name]
     if r.get("dynamic"): r = dynamic_rice(r, wp)
@@ -219,6 +228,7 @@ def apply(name, set_wall=True):
     write(C / "kitty/rice-colors.conf", kitty_colors(r))
     write(C / "hypr/rice.lua", lua(r))
     write(STATE, name + "\n")
+    LASTF.write_text(name + "\n")
     cur = H / ".cache/current-wallpaper"
     if set_wall and os.path.exists(wp):
         cur.parent.mkdir(parents=True, exist_ok=True)
@@ -234,6 +244,7 @@ def apply(name, set_wall=True):
     sh("pkill -USR1 -x kitty")
     sh("dunstctl reload")
     sh("pkill -x waybar")  # restart loop brings it back (never SIGUSR2, it crashes with mpris)
+    ensure_bar()   # and make sure it really got drawn
     sh(f"notify-send -t 2500 'Wardrobe' '{name}: {r['desc']}'")
 
 def current():
@@ -246,6 +257,15 @@ def main():
         for n in ORDER: print(("* " if n == current() else "  ") + f"{n:8} {RICES[n]['desc']}")
     elif a[0] == "current": print(current())
     elif a[0] == "apply": apply(a[1])
+    elif a[0] == "omarchy-keep": omarchy_keep(a[1])
+    elif a[0] == "refresh":   # re-read your keybinds into the active full rice
+        cur = current()
+        if cur in RICES and RICES[cur].get("full"):
+            (prepare_omarchy if RICES[cur].get("prepare") == "omarchy" else prepare_full)(cur); _sh("hyprctl reload")
+    elif a[0] == "recover":   # put your own config back no matter what state a full rice left things in
+        for n in RICES:
+            if RICES[n].get("full"): leave_full(n)
+        apply("noir" if len(a) < 2 else a[1])
     elif a[0] == "retheme": apply(current(), set_wall=False)   # same rice, keep wallpaper (aurora re-derives colours)
     elif a[0] == "next":
         apply(ORDER[(ORDER.index(current()) + 1) % len(ORDER)] if current() in ORDER else ORDER[0])
