@@ -21,7 +21,7 @@ def pal(**kw):
 RICES = {
     "noir": dict(wall="~/Pictures/wallpapers/noir/orbital-sunrise.jpg", desc="Catppuccin accents on black, floating rounded (original)",
         pal=pal(), border=("cba6f7", "f5c2e7", "89b4fa"), accent="b4befe", inactive="313244",
-        rounding=11, gaps_in=1, gaps_out=3, border_size=0, blur=(5, 2), bar_r=19, bar_a=0.45, anim="bouncy", kitty_a=0.4,
+        rounding=11, gaps_in=1, gaps_out=3, border_size=0, blur=(5, 2), bar_r=16, bar_a=0.45, anim="bouncy", kitty_a=0.4,
         radius=0.9, layers=("waybar",), blur_alpha=0.2),
     "liquid": dict(wall="~/Pictures/wallpapers/liquid/liquid-plasma.jpg", desc="Liquid glass: frosted see-through panels, heavy blur, big soft corners",
         pal=pal(rosewater="ffffff", pink="e6d6ff", mauve="c9b8ff", red="ff9bb3", peach="ffd2a8", yellow="fff1b8",
@@ -29,7 +29,7 @@ RICES = {
                 sub1="dbe3f2", sub0="c2cce0", ov2="a7b3cc", ov1="8f9bb5", ov0="7380a0", s2="4d587a", s1="2f3856",
                 mantle="0b0e18", crust="000000", base="000000"),
         border=("ffffff", "bfe9ff", "e6d6ff"), accent="dbe9ff", inactive="5d6a8a",
-        rounding=15, gaps_in=3, gaps_out=7, border_size=1, blur=(12, 4), bar_r=17, bar_a=0.25, anim="smooth", kitty_a=0.3,
+        rounding=15, gaps_in=3, gaps_out=7, border_size=1, blur=(12, 4), bar_r=15, bar_a=0.25, anim="smooth", kitty_a=0.3,
         radius=1.15, glass=0.35, layers=("waybar", "notifications", "logout_dialog", "swayosd")),
     "mono": dict(wall="~/Pictures/wallpapers/mono/saturn-grey.jpg", desc="Pure greyscale, flat and instant, no animations",
         pal=pal(rosewater="ffffff", pink="e0e0e0", mauve="d0d0d0", red="ffffff", peach="c8c8c8", yellow="f0f0f0",
@@ -42,7 +42,14 @@ RICES = {
 RICES["aurora"] = dict(wall="~/Pictures/wallpapers/aurora/earth-limb.jpg", dynamic=True,
     desc="Colours pulled from the wallpaper (matugen) on a black base",
     pal=pal(), border=("cba6f7", "f5c2e7", "89b4fa"), accent="b4befe", inactive="313244",
-    rounding=9, gaps_in=2, gaps_out=6, border_size=2, blur=(8, 3), bar_r=13, bar_a=0.6, anim="smooth", kitty_a=0.4, radius=0.8)
+    rounding=9, gaps_in=2, gaps_out=6, border_size=2, blur=(8, 3), bar_r=11, bar_a=0.6, anim="smooth", kitty_a=0.4, radius=0.8)
+RICES["ml4w"] = dict(wall="~/Pictures/wallpapers/aurora/earth-limb.jpg",
+    desc="ML4W look: teal Material You colours, soft gradient border, roomy gaps",
+    pal=pal(mauve="81d5cd", lavender="81d5cd", blue="b0ccc8", sky="b0ccc8", teal="afc9e7", pink="afc9e7", rosewater="9df2e9",
+            text="dde4e2", sub1="bec9c6", sub0="bec9c6", ov2="899391", ov1="899391", ov0="3f4947",
+            s2="2f3736", s1="232b2a", mantle="0a0f0e", crust="000000", base="0e1514"),
+    border=("81d5cd", "003734"), accent="81d5cd", inactive="3f4947", angle=90,
+    rounding=10, gaps_in=10, gaps_out=16, border_size=2, blur=(4, 4), bar_r=16, bar_a=0.8, anim="ml4w", kitty_a=0.85, radius=1.0)
 ORDER = list(RICES)
 
 def dynamic_rice(r, wp):
@@ -100,6 +107,18 @@ hl.animation({ leaf = "windows",     enabled = true, speed = 5, spring = "glide"
 hl.animation({ leaf = "windowsMove", enabled = true, speed = 5, spring = "glide" })
 hl.animation({ leaf = "windowsIn",   enabled = true, speed = 5, bezier = "overshot",  style = "popin 60%" })
 hl.animation({ leaf = "workspaces",  enabled = true, speed = 5, bezier = "easeOutQuint", style = "slide" })''',
+        "ml4w": '''hl.config({ animations = { enabled = true } })
+hl.curve("md3_decel", { type = "bezier", points = { {0.05, 0.7}, {0.1, 1} } })
+hl.curve("md3_accel", { type = "bezier", points = { {0.3, 0}, {0.8, 0.15} } })
+hl.curve("menu_decel", { type = "bezier", points = { {0.1, 1}, {0, 1} } })
+hl.curve("menu_accel", { type = "bezier", points = { {0.38, 0.04}, {1, 0.07} } })
+hl.animation({ leaf = "windows",     enabled = true, speed = 3, bezier = "md3_decel", style = "popin 60%" })
+hl.animation({ leaf = "windowsIn",   enabled = true, speed = 3, bezier = "md3_decel", style = "popin 60%" })
+hl.animation({ leaf = "windowsOut",  enabled = true, speed = 3, bezier = "md3_accel", style = "popin 60%" })
+hl.animation({ leaf = "fade",        enabled = true, speed = 3, bezier = "md3_decel" })
+hl.animation({ leaf = "layersIn",    enabled = true, speed = 3, bezier = "menu_decel", style = "slide" })
+hl.animation({ leaf = "layersOut",   enabled = true, speed = 1.6, bezier = "menu_accel" })
+hl.animation({ leaf = "workspaces",  enabled = true, speed = 7, bezier = "menu_decel", style = "slide" })''',
         "smooth": '''hl.config({ animations = { enabled = true } })
 hl.animation({ leaf = "windows",     enabled = true, speed = 4, bezier = "easeOutQuint", style = "popin 90%" })
 hl.animation({ leaf = "windowsIn",   enabled = true, speed = 4, bezier = "easeOutQuint", style = "popin 90%" })
@@ -117,7 +136,7 @@ hl.config({{
     general = {{
         gaps_in = {r["gaps_in"]}, gaps_out = {r["gaps_out"]}, border_size = {r["border_size"]},
         col = {{
-            active_border   = {{ colors = {{ {b} }}, angle = 45 }},
+            active_border   = {{ colors = {{ {b} }}, angle = {r.get('angle', 45)} }},
             inactive_border = "{rgba(r["inactive"], "88")}",
         }},
     }},
