@@ -97,7 +97,7 @@ window#waybar {
 #custom-touchpad,
 #custom-notification,
 #custom-power {
-    padding: 0 8px;
+    padding: 0 6px;   /* 6, not 8: on the laptop screen the bar is nearly full, and when it overflows the clock slides over the right side */
 }
 
 tooltip {

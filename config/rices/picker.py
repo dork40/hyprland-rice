@@ -42,6 +42,17 @@ class Picker(Gtk.Application):
         self._closing = True
         popup_anim.animate_out(self._win, self._panel, self.quit)
 
+    def choose(self, name):
+        if name == wardrobe.current():   # the same rice again: re-apply it, then the usual fade-out
+            wardrobe.apply(name); return self.close_anim()
+        # Off the screen at once, before the switch animation starts: Hyprland fades the picker out over the desktop.
+        # If it were still up when the rice reloads, that fade-out would play on top of the animation.
+        self._closing = True
+        self._win.set_visible(False)
+        self._win.get_display().sync()   # wait until Hyprland has really taken it off
+        wardrobe.apply(name)
+        self.quit()
+
     def do_activate(self):
         win = Gtk.ApplicationWindow(application=self)
         LayerShell.init_for_window(win)
@@ -58,7 +69,7 @@ class Picker(Gtk.Application):
         tw, th = (TW, TH) if n > 3 else (560, 350)     # with only a few rices, make the cards bigger to fill the panel
         grid = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.SINGLE, homogeneous=True, min_children_per_line=cols,
                            max_children_per_line=cols, row_spacing=14, column_spacing=14, activate_on_single_click=True)
-        grid.connect("child-activated", lambda _g, c: (wardrobe.apply(c.rice), self.close_anim()))
+        grid.connect("child-activated", lambda _g, c: self.choose(c.rice))
         cur = wardrobe.current(); sel = None
         for name in wardrobe.ORDER:
             r = wardrobe.RICES[name]

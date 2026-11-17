@@ -204,7 +204,28 @@ def last_normal():
     try: return LASTF.read_text().strip() or "noir"
     except OSError: return "noir"
 
+def transition(old, new):
+    """The switch animation (intro.py --switch, if it is there and not turned off with ~/.config/rices/intro-off): start it and
+    return it once it covers the screen. None if it is not there, or does not get going within 3 seconds."""
+    intro = R / "intro.py"
+    if (R / "intro-off").exists() or not os.access(intro, os.X_OK): return None
+    try:
+        p = subprocess.Popen([str(intro), "--switch", old, new], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                             stderr=subprocess.DEVNULL, text=True, start_new_session=True)
+    except OSError:
+        return None
+    import select
+    if select.select([p.stdout], [], [], 3.0)[0] and p.stdout.readline().strip() == "closed": return p
+    p.kill(); return None
+
+def transition_done(p):
+    """Tell the switch animation the new rice is in: it opens once the new bar is drawn."""
+    try: p.stdin.write("applied\n"); p.stdin.close()
+    except (OSError, ValueError): pass
+
 def apply(name, set_wall=True):
+    """Switch to rice `name`. Going from one of your own rices to another, the switch animation covers the screen while
+    everything is rewritten and reloaded. True when the animation played."""
     cur = current()
     if cur in RICES and RICES[cur].get("full") and cur != name:
         leave_full(cur)   # also when going from one full rice straight to another
@@ -212,40 +233,45 @@ def apply(name, set_wall=True):
     if RICES[name].get("full"):
         if current() != name: enter_full(name)
         return
-    wp = pick_wall(name)
-    r = RICES[name]
-    if r.get("dynamic"): r = dynamic_rice(r, wp)
-    p = r["pal"]
-    g = r.get("glass")
-    base = lambda f: glassify((R / "base" / f).read_text(), g) if g else (R / "base" / f).read_text()
-    write(C / "waybar/style.css", restyle(recolor(base("waybar.css"), p), r, bar=True) + bar_overlay(r))
-    write(C / "wofi/style.css", restyle(recolor(base("wofi.css"), p), r))
-    write(C / "wlogout/style.css", restyle(recolor(base("wlogout.css"), p), r))
-    write(C / "swayosd/style.css", restyle(recolor(base("swayosd.css"), p), r))
-    write(C / "dunst/dunstrc", restyle(recolor(base("dunstrc"), p), r))
-    import json
-    write(H / ".cache/rice-palette.json", json.dumps({"pal": p, "radius": r.get("radius", 1.0), "name": name}))
-    write(C / "kitty/rice-colors.conf", kitty_colors(r))
-    write(C / "hypr/rice.lua", lua(r))
-    write(STATE, name + "\n")
-    LASTF.write_text(name + "\n")
-    cur = H / ".cache/current-wallpaper"
-    if set_wall and os.path.exists(wp):
-        cur.parent.mkdir(parents=True, exist_ok=True)
-        if cur.is_symlink() or cur.exists(): cur.unlink()
-        cur.symlink_to(wp)
-        try:
-            subprocess.Popen(["awww", "img", wp, "--transition-type", "grow", "--transition-pos", "0.5,0.5", "--transition-duration", "1.2"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-        except FileNotFoundError:
-            pass   # awww (the wallpaper tool) is not installed yet
-    sh = lambda c: subprocess.run(c, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    sh("hyprctl reload")
-    sh("pkill -USR1 -x kitty")
-    sh("dunstctl reload")
-    sh("pkill -x waybar")  # restart loop brings it back (never SIGUSR2, it crashes with mpris)
+    fx = transition(cur, name) if set_wall and cur != name and cur in RICES and not RICES[cur].get("full") else None
+    try:
+        wp = pick_wall(name)
+        r = RICES[name]
+        if r.get("dynamic"): r = dynamic_rice(r, wp)
+        p = r["pal"]
+        g = r.get("glass")
+        base = lambda f: glassify((R / "base" / f).read_text(), g) if g else (R / "base" / f).read_text()
+        write(C / "waybar/style.css", restyle(recolor(base("waybar.css"), p), r, bar=True) + bar_overlay(r))
+        write(C / "wofi/style.css", restyle(recolor(base("wofi.css"), p), r))
+        write(C / "wlogout/style.css", restyle(recolor(base("wlogout.css"), p), r))
+        write(C / "swayosd/style.css", restyle(recolor(base("swayosd.css"), p), r))
+        write(C / "dunst/dunstrc", restyle(recolor(base("dunstrc"), p), r))
+        import json
+        write(H / ".cache/rice-palette.json", json.dumps({"pal": p, "radius": r.get("radius", 1.0), "name": name}))
+        write(C / "kitty/rice-colors.conf", kitty_colors(r))
+        write(C / "hypr/rice.lua", lua(r))
+        write(STATE, name + "\n")
+        LASTF.write_text(name + "\n")
+        cur = H / ".cache/current-wallpaper"
+        if set_wall and os.path.exists(wp):
+            cur.parent.mkdir(parents=True, exist_ok=True)
+            if cur.is_symlink() or cur.exists(): cur.unlink()
+            cur.symlink_to(wp)
+            how = ["--transition-type", "none"] if fx else ["--transition-type", "grow", "--transition-pos", "0.5,0.5", "--transition-duration", "1.2"]
+            try:   # under the switch animation the new wallpaper goes in at once, it is hidden anyway
+                subprocess.Popen(["awww", "img", wp] + how, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+            except FileNotFoundError:
+                pass   # awww (the wallpaper tool) is not installed yet
+        sh = lambda c: subprocess.run(c, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        sh("hyprctl reload")
+        sh("pkill -USR1 -x kitty")
+        sh("dunstctl reload")
+        sh("pkill -x waybar")  # restart loop brings it back (never SIGUSR2, it crashes with mpris)
+    finally:
+        if fx: transition_done(fx)   # also if something above failed, so the animation never stays on screen
     ensure_bar()   # and make sure it really got drawn
     sh(f"notify-send -t 2500 'Wardrobe' '{name}: {r['desc']}'")
+    return fx is not None
 
 def current():
     try: return STATE.read_text().strip()
