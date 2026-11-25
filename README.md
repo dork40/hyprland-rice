@@ -1,27 +1,63 @@
-# Hyprland rice
+<h1 align="center">hyprland-rice</h1>
 
-A complete, good-looking **Hyprland desktop you can install with one command**: a black, glassy, minimal setup with a bar, launcher, notifications, terminal, wallpapers and a handful of small apps that make it easy to live in. Works on **Arch, Fedora and Ubuntu/Debian**, with **NVIDIA support**.
+<p align="center">
+  A complete Hyprland desktop that installs with one command.<br>
+  Black, glassy and minimal, with four styles you can swap with one key.
+</p>
 
-**One installer for laptops and PCs, NVIDIA, AMD and Intel.** When you run it, it asks which computer you have (**laptop** or **PC**) and which graphics card (**NVIDIA**, **AMD**, **Intel**, or a hybrid like NVIDIA + AMD), suggests the right answer, and sets everything up for that choice.
+<p align="center">
+  <img src="https://img.shields.io/badge/Hyprland-0.56%2B-58e1ff?style=flat-square&logo=hyprland&logoColor=white" alt="Hyprland 0.56+">
+  <img src="https://img.shields.io/badge/Arch-tested-1793d1?style=flat-square&logo=archlinux&logoColor=white" alt="Arch">
+  <img src="https://img.shields.io/badge/Fedora-tested-51a2da?style=flat-square&logo=fedora&logoColor=white" alt="Fedora">
+  <img src="https://img.shields.io/badge/Ubuntu-tested-e95420?style=flat-square&logo=ubuntu&logoColor=white" alt="Ubuntu">
+  <img src="https://img.shields.io/badge/Bazzite-tested-8f5bd7?style=flat-square" alt="Bazzite">
+  <img src="https://img.shields.io/github/license/dork40/hyprland-rice?style=flat-square&color=555" alt="MIT">
+</p>
 
-### What you get
+![noir, the default style](docs/screenshots/noir.jpg)
 
-- **Wardrobe**: one keypress (`Super+Shift+R`) swaps the whole look at once, wallpaper included (see the three styles below).
-- **A finished desktop**: Waybar, wofi launcher, dunst notifications, kitty terminal, a power menu, volume and brightness pop-ups, clipboard history, an emoji picker, a screenshot tool and a screen text-copy (OCR) shortcut.
-- **Displays app** (`Super+Shift+D`): resolution, refresh rate, scale, rotation and drag-to-arrange for several monitors, with a "keep these settings?" countdown so you can't lock yourself out.
-- **AI switcher** (`Super+Shift+Ctrl+...`): one key to jump to Claude Code, Codex, Gemini, OpenCode, Aider, Ollama or a web chat, with an optional yolo mode.
-- **Welcome window** (`Super+F1`): a first-login guide to the basics, so a new user knows how to open apps, move windows and change the look.
-- **A real installer**: installs the dependencies for your distro, backs up your old configs first, and sets up NVIDIA drivers when it finds an NVIDIA GPU.
+```sh
+git clone https://github.com/dork40/hyprland-rice.git ~/hyprland-rice && cd ~/hyprland-rice && ./install.sh
+```
 
-### The three styles
+That's the whole install. It pulls in Hyprland and every dependency for your distro, backs up your old configs, sets up the login screen and asks two questions: laptop or PC, and which graphics card (NVIDIA, AMD, Intel or hybrid).
 
-| Style | Look |
+## Styles
+
+`Super+Shift+R` opens the Wardrobe. Pick a style and the whole desktop changes at once: bar, windows, launcher, notifications, terminal colours and wallpaper.
+
+![Wardrobe style picker](docs/screenshots/wardrobe.jpg)
+
+| | |
 |---|---|
-| **noir** | Catppuccin accents on black, floating rounded corners (default) |
-| **liquid** | Frosted liquid glass: see-through panels, heavy blur, soft corners |
-| **mono** | Pure greyscale, flat and instant, no animations |
+| ![noir](docs/screenshots/noir.jpg) **noir**: Catppuccin accents on black, floating rounded windows (default) | ![liquid](docs/screenshots/liquid.jpg) **liquid**: frosted glass, see-through panels, heavy blur |
+| ![mono](docs/screenshots/mono.jpg) **mono**: pure greyscale, flat and instant, no animations | ![aurora](docs/screenshots/aurora.jpg) **aurora**: colours pulled from the wallpaper on a black base |
 
 Wallpapers are public-domain NASA photos (credits in `wallpapers/CREDITS.md`).
+
+## What you get
+
+- **A finished desktop**: Waybar, launcher, dunst notifications, kitty, a power menu, volume and brightness pop-ups, clipboard history, emoji picker, screenshots, screen recording and a copy-text-from-screen (OCR) shortcut.
+- **Wardrobe** (`Super+Shift+R`): the style switcher above.
+- **Displays app** (`Super+Shift+D`): resolution, refresh rate, scale, rotation and drag-to-arrange for several monitors, with a "keep these settings?" countdown so a bad setting can't lock you out.
+- **AI switcher** (`Super+Shift+Ctrl+...`): one key to jump to Claude Code, Codex, Gemini, OpenCode, Aider, Ollama or a web chat.
+- **Welcome window** (`Super+F1`): a first-login guide, so someone new to Hyprland knows how to open apps, move windows and change the look.
+
+## Tested on
+
+The installer is tested on clean virtual machines: a fresh cloud image with nothing installed, then the install line above, exactly as a new user would run it. The test then checks that Hyprland, every tool the rice uses, the fonts, the login session and the config are all in place, and that Hyprland accepts the config.
+
+| Distro | Version | Result |
+|---|---|---|
+| Arch Linux | rolling | **Pass**: Hyprland 0.57.2 and everything else, `yay` set up automatically for the AUR |
+| Fedora | 45 | **Pass**: Hyprland from the COPR. SwayOSD isn't packaged, so the volume/brightness keys show plain notifications |
+| Bazzite | stable (Fedora 45 base) | **Pass**: install, reboot, install again. Xwayland is swapped automatically |
+| Ubuntu | 26.04 LTS | **Pass**: Hyprland from the PPA, `awww` built from source (adds a few minutes) |
+| Ubuntu | 24.04 LTS | **Partial**: Hyprland and the desktop work, but 24.04 is too old for the Wardrobe/Welcome windows (no gtk4-layer-shell) and wallpapers (Rust too old to build `awww`) |
+
+Last run: November 2026, Hyprland 0.57.2.
+
+The test harness is in [`tests/vm`](tests/vm), so anyone can re-run it (`tests/vm/images.sh`, then `tests/vm/test.sh <distro> <port>`).
 
 ## Install
 
@@ -31,7 +67,7 @@ cd ~/hyprland-rice
 ./install.sh
 ```
 
-Paste all three lines. `./install.sh` installs everything: the packages (it asks for your password), the configs, the wallpapers and the apps below. The block works the first time and every time after: it downloads the rice, or updates it if you already have it. The installer also updates itself to the latest version before it starts.
+Paste all three lines (this version also works for updating). `./install.sh` installs everything: the packages (it asks for your password), the configs, the wallpapers and the apps below. The block works the first time and every time after: it downloads the rice, or updates it if you already have it. The installer also updates itself to the latest version before it starts.
 
 The installer asks two questions (laptop or PC, and which graphics card) and then does everything. There is nothing else to pick through. It checks all the packages in one go and **skips what you already have** (already running Hyprland but no wofi? It installs just wofi, and the rest). It also installs **SDDM** as your login screen and sets it to start Hyprland. It installs only what the rice itself uses: Hyprland and its helpers (hypridle, hyprpaper, hyprpicker), Waybar, wofi, dunst, kitty, swayosd, wlogout, thunar (files), clipboard history, screenshots and screen recording, media keys, the volume/network/Bluetooth applets, the starship prompt and the JetBrainsMono Nerd Font. It does not install anyone's personal apps.
 
@@ -41,7 +77,7 @@ Existing configs are backed up to `~/.config-rice-backup-<date>` before anything
 
 After the install (and the reboot it asks for), the login screen starts Hyprland by default. If it still offers your old desktop (it says something like "Plasma (Wayland)"), click that session label, usually at the bottom-left of the screen, choose **Hyprland**, and log in. If there is no session menu, press `Ctrl+Alt+F3`, log in as text and type `Hyprland`.
 
-On Bazzite and other immutable Fedora systems the installer needs two runs with a reboot between them. It tells you when.
+On Bazzite and other immutable Fedora systems: run the installer, reboot, and run it once more.
 
 ## AI switcher
 
@@ -91,14 +127,15 @@ On your first login a **Welcome** window opens with the basics: how to open apps
 
 | Distro | How |
 |---|---|
-| **Arch** (and Arch-based) | `pacman`, plus the AUR (`awww`, `blesh-git`, `rofimoji`) through `yay` or `paru` |
-| **Fedora** | `dnf`, with a Hyprland COPR for a current Hyprland: the installer tries [`solopasha/hyprland`](https://copr.fedorainfracloud.org/coprs/solopasha/hyprland/) and [`pm4rcin/Hyprland`](https://copr.fedorainfracloud.org/coprs/pm4rcin/Hyprland/) and uses whichever has packages for your Fedora version (Fedora 44 and newer at the moment) |
-| **Bazzite / Fedora Atomic** (Silverblue, Kinoite, Aurora) | `rpm-ostree` layering with the same COPR. The NVIDIA driver and your login screen are left alone. **Reboot after the install** to get the new packages, then pick the Hyprland session at login. Packages Fedora doesn't ship (for example SwayOSD) are skipped and listed; the volume and brightness keys then use plain notifications. Bazzite's own Xwayland conflicts with Hyprland's package, so the installer offers to swap it for Fedora's |
-| **Ubuntu / Debian** | `apt`; Hyprland and its companion tools are only installed if your release ships them |
+| **Arch** (and Arch-based) | Updates the system first (`pacman -Syu`), then installs from the repos. AUR packages (such as `wlogout`) go through `yay` or `paru`; on a fresh Arch with neither, the installer sets up [`yay`](https://github.com/Jguer/yay) for you |
+| **Fedora** | `dnf`, plus a Hyprland COPR because Fedora's own Hyprland stopped at 0.45. It uses the first of [`sdegler/hyprland`](https://copr.fedorainfracloud.org/coprs/sdegler/hyprland/), [`pm4rcin/Hyprland`](https://copr.fedorainfracloud.org/coprs/pm4rcin/Hyprland/) or `solopasha/hyprland` that has packages for your Fedora version |
+| **Bazzite / Fedora Atomic** (Silverblue, Kinoite, Aurora) | `rpm-ostree` layering with the same COPR. Run `./install.sh`, reboot, then run `./install.sh` once more to finish the last pieces (that's the flow the VM test checks). The NVIDIA driver and your login screen are left alone. Bazzite's own Xwayland conflicts with Hyprland's package, so the installer swaps it for Fedora's (undo with `rpm-ostree rollback`) |
+| **Ubuntu** (and Mint, Pop!_OS) | `apt`. If your Ubuntu's Hyprland is missing or older than 0.56 (anything before 26.10), the installer adds the [Hyprland PPA](https://launchpad.net/~cppiber/+archive/ubuntu/hyprland), maintained by Hyprland team member Constantin Piber |
+| **Debian** | `apt`, from your release. Hyprland 0.56+ is only in testing/unstable |
 
-Anything the distro doesn't ship is listed at the end, so you know what to install by hand. The JetBrainsMono Nerd Font and the `starship` prompt are downloaded from their GitHub releases on non-Arch systems. Arch is the tested path; Fedora and Ubuntu are best-effort.
+Anything your distro doesn't ship is listed at the end. If Hyprland itself could not be installed, the installer says so plainly and stops instead of saying "Done". The JetBrainsMono Nerd Font and the `starship` prompt come from their GitHub releases on non-Arch systems. Where `awww` (wallpapers) isn't packaged, `swww` (its previous name) is used instead.
 
-**Important:** the config uses Hyprland's newer **Lua config format** (written against Hyprland 0.56). On Ubuntu/Debian releases that ship an older Hyprland, install a newer one (build from source, or use a newer release) or the config won't load. The installer warns you if your version looks too old.
+**Note:** the config uses Hyprland's **Lua config format** (Hyprland 0.56 and newer). The installer gets you a new enough Hyprland on every distro in the table above except Debian stable.
 
 ## Keys
 

@@ -127,9 +127,9 @@ arch)
     NVIDIA=(nvidia-open-dkms nvidia-utils lib32-nvidia-utils nvidia-settings libva-nvidia-driver egl-wayland linux-headers) ;;
 fedora)
     PKGS=(hyprland waybar wofi dunst kitty swayosd hypridle hyprpaper wlogout python3 python3-gobject gtk4
-          gtk4-layer-shell ffmpeg-free curl libnotify xdg-desktop-portal-hyprland thunar sddm fontconfig xz
+          gtk4-layer-shell ffmpeg-free curl libnotify xdg-desktop-portal-hyprland Thunar sddm fontconfig xz
           cliphist wl-clipboard grim slurp hyprpicker wf-recorder playerctl tesseract tesseract-langpack-eng btop udiskie
-          network-manager-applet blueman polkit-kde pavucontrol papirus-icon-theme breeze-cursor-theme rofimoji awww)
+          network-manager-applet blueman polkit-kde pavucontrol papirus-icon-theme breeze-cursor-theme rofimoji swww)
     AUR=()
     NVIDIA=(akmod-nvidia xorg-x11-drv-nvidia-cuda libva-nvidia-driver egl-wayland) ;;
 debian)
@@ -137,7 +137,7 @@ debian)
           gir1.2-gtk4layershell-1.0 libgtk4-layer-shell0 ffmpeg curl libnotify-bin xdg-desktop-portal-hyprland thunar sddm
           fontconfig xz-utils cliphist wl-clipboard grim slurp hyprpicker wf-recorder playerctl tesseract-ocr
           tesseract-ocr-eng btop udiskie network-manager-gnome blueman polkit-kde-agent-1 pavucontrol
-          papirus-icon-theme breeze-cursor-theme rofimoji)
+          papirus-icon-theme breeze-cursor-theme rofimoji awww)
     AUR=()
     NVIDIA=() ;;   # Ubuntu/Debian: `ubuntu-drivers install` / nvidia-driver handled below
 *)  PKGS=(); AUR=(); NVIDIA=() ;;
@@ -160,7 +160,7 @@ COPR=""; FEDORA_VER=""
 pick_copr() {
     FEDORA_VER=${RICE_FEDORA_VER:-$(. /etc/os-release; echo "${VERSION_ID:-$(rpm -E %fedora 2>/dev/null)}")}
     local c o p
-    for c in solopasha/hyprland pm4rcin/Hyprland; do
+    for c in sdegler/hyprland pm4rcin/Hyprland solopasha/hyprland; do   # sdegler = the maintained fork of solopasha's (stopped)
         o=${c%/*}; p=${c#*/}
         if curl -fsI -o /dev/null "https://copr.fedorainfracloud.org/coprs/$o/$p/repo/fedora-$FEDORA_VER/$o-$p-fedora-$FEDORA_VER.repo"; then
             COPR=$c; return 0
@@ -172,10 +172,10 @@ pick_copr() {
 MISSING=(); SKIPPED=()
 # package -> the command it provides, so a hand-built or differently packaged tool also counts as "already there"
 declare -A CMD_OF=([hyprland]=Hyprland [waybar]=waybar [wofi]=wofi [dunst]=dunst [kitty]=kitty [swayosd]=swayosd-server
-    [hypridle]=hypridle [hyprpaper]=hyprpaper [wlogout]=wlogout [starship]=starship [thunar]=thunar [cliphist]=cliphist
+    [hypridle]=hypridle [hyprpaper]=hyprpaper [wlogout]=wlogout [starship]=starship [thunar]=thunar [Thunar]=thunar [cliphist]=cliphist
     [wl-clipboard]=wl-copy [grim]=grim [slurp]=slurp [hyprpicker]=hyprpicker [wf-recorder]=wf-recorder [playerctl]=playerctl
     [btop]=btop [udiskie]=udiskie [network-manager-applet]=nm-applet [network-manager-gnome]=nm-applet [blueman]=blueman-manager
-    [pavucontrol]=pavucontrol [rofimoji]=rofimoji [awww]=awww [sddm]=sddm [brightnessctl]=brightnessctl [tesseract]=tesseract
+    [pavucontrol]=pavucontrol [rofimoji]=rofimoji [awww]=awww [swww]=swww [sddm]=sddm [brightnessctl]=brightnessctl [tesseract]=tesseract
     [tesseract-ocr]=tesseract [curl]=curl [ffmpeg]=ffmpeg [ffmpeg-free]=ffmpeg)
 # One query per distro for everything we need to know (was one slow query per package)
 declare -A INST AVAIL
@@ -224,7 +224,7 @@ except Exception: pass" 2>/dev/null)
         if ((attempt == 1)); then echo "  Clearing the earlier half-finished package changes..."; sudo rpm-ostree reset || true; fi
         set +e; sudo rpm-ostree override remove "$cur" "${args[@]}" 2>&1 | tee "$tmp"; local rc=${PIPESTATUS[0]}; set -e
         ((rc == 0)) && { rm -f "$tmp"; return 0; }
-        local nf; nf=$(sed -n 's/.*Packages not found: //p' "$tmp" | head -1)
+        local nf; nf=$(sed -n 's/.*Packages not found: //p' "$tmp" | head -1); nf=${nf//,/ }   # rpm-ostree separates them with ", "
         [[ -z $nf ]] && break
         echo "  Not in your Fedora's repos, skipping: $nf"
         for p in $nf; do MISSING+=("$p"); done
@@ -324,7 +324,7 @@ atomic_install() {
         rpmostree_wait
         set +e; sudo rpm-ostree install --idempotent --allow-inactive "${list[@]}" 2>&1 | tee "$tmp"; rc=${PIPESTATUS[0]}; set -e
         ((rc == 0)) && { rm -f "$tmp"; return 0; }
-        nf=$(sed -n 's/.*Packages not found: //p' "$tmp" | head -1)
+        nf=$(sed -n 's/.*Packages not found: //p' "$tmp" | head -1); nf=${nf//,/ }
         if [[ -z $nf ]]; then
             if { grep -qi 'xwayland' "$tmp" || { printf '%s\n' "${list[@]}" | grep -qx hyprland && rpm -qa 2>/dev/null | grep -qi '^terra-xorg-x11-server-Xwayland'; }; } && fix_xwayland; then
                 XWL_PENDING=1
@@ -381,11 +381,12 @@ pkg_install() {
     esac
 }
 install_nerd_font() {
-    fc-list 2>/dev/null | grep -qi "JetBrainsMono Nerd" && return 0
+    grep -qi "JetBrainsMono Nerd" < <(fc-list 2>/dev/null) && return 0   # (not a pipe: with pipefail, grep -q quitting early fails it)
     say "Installing JetBrainsMono Nerd Font (the bar's icons need it)"
     local d="$HOME/.local/share/fonts/JetBrainsMonoNF" tmp; tmp=$(mktemp -d)
     curl -fsSL --retry 3 -o "$tmp/f.tar.xz" https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.tar.xz
-    mkdir -p "$d"; tar -xJf "$tmp/f.tar.xz" -C "$d"; fc-cache -f "$d"; rm -rf "$tmp"
+    mkdir -p "$d"; tar -xJf "$tmp/f.tar.xz" -C "$d"; rm -rf "$tmp"
+    if command -v fc-cache >/dev/null; then fc-cache -f "$d"; fi   # (minimal systems get fontconfig with the packages; cached again after)
 }
 install_starship() {
     command -v starship >/dev/null && return 0
@@ -405,6 +406,9 @@ if [[ $DISTRO == unknown ]]; then
 else
     say "Detected distro: $DISTRO"
     case $DISTRO in
+        arch)   # sync first: an out-of-date package list points at files the mirrors have deleted (404s). -Syu, never a partial -Sy
+            say "Updating the system first (pacman -Syu), so every package downloads"
+            sudo pacman -Syu --noconfirm ;;
         fedora)
             if pick_copr; then
                 o=${COPR%/*}; p=${COPR#*/}
@@ -423,12 +427,26 @@ else
                 echo "  install a current Hyprland yourself (or move to a Fedora version that has a COPR), then run this again."
                 keep=(); for p in "${PKGS[@]}"; do [[ $p == hyprland ]] || keep+=("$p"); done; PKGS=("${keep[@]}"); MISSING+=("hyprland(0.56+)")
             fi ;;
-        debian) sudo apt-get update ;;
+        debian)
+            sudo apt-get update
+            # The Lua config needs Hyprland 0.56+, which Ubuntu only ships from 26.10. On older Ubuntu (and Mint, Pop!_OS...) use the
+            # PPA of Constantin Piber, a Hyprland maintainer: it has current Hyprland and its tools for every supported Ubuntu.
+            hv=$(apt-cache policy hyprland 2>/dev/null | awk '/Candidate:/{print $2}')
+            if [[ -z $hv || $hv == "(none)" ]] || ! printf '0.56\n%s\n' "${hv%%[+~-]*}" | sort -VC; then
+                if grep -qw ubuntu <<<"$ids"; then
+                    say "Your Ubuntu's Hyprland is ${hv:-missing} and this rice needs 0.56+: adding the Hyprland PPA (ppa:cppiber/hyprland)"
+                    command -v add-apt-repository >/dev/null || sudo apt-get install -y software-properties-common
+                    sudo add-apt-repository -y ppa:cppiber/hyprland
+                    sudo apt-get update
+                else
+                    echo "  Debian's Hyprland is ${hv:-missing}, and this config needs 0.56+. Debian testing/unstable has it."
+                fi
+            fi ;;
     esac
     say "Installing packages (anything your distro doesn't ship is listed at the end)"
     if [[ $DISTRO != arch ]]; then   # download the font and the prompt in the background while packages install
         PREFETCH_LOG=$(mktemp)
-        { install_nerd_font; install_starship; } >"$PREFETCH_LOG" 2>&1 &
+        { install_nerd_font || echo "==> the font download failed"; install_starship; } >"$PREFETCH_LOG" 2>&1 &
         PREFETCH_PID=$!
     fi
     load_state
@@ -446,6 +464,14 @@ else
         MISSING=()
         if ((${#aur_try[@]})); then
             helper=$(command -v yay || command -v paru || true)
+            if [[ -z $helper ]] && ((EUID != 0)); then   # fresh Arch has no AUR helper: set up yay (github.com/Jguer/yay) once
+                say "No AUR helper found: setting up yay so AUR packages (${aur_try[*]}) can install"
+                sudo pacman -S --needed --noconfirm base-devel git
+                ytmp=$(mktemp -d)
+                if git clone -q --depth 1 https://aur.archlinux.org/yay-bin.git "$ytmp/yay-bin" &&
+                   (cd "$ytmp/yay-bin" && makepkg -si --noconfirm --needed); then helper=$(command -v yay || true); fi
+                rm -rf "$ytmp"
+            fi
             if [[ -n $helper ]]; then
                 say "Installing from the AUR with ${helper##*/}: ${aur_try[*]}"
                 if ! "$helper" -S --needed --noconfirm "${aur_try[@]}"; then
@@ -460,6 +486,36 @@ else
     if [[ -n ${PREFETCH_PID:-} ]]; then
         wait "$PREFETCH_PID" || echo "  (the font/prompt download had a problem)"
         sed -n 's/^.*==> //p' "$PREFETCH_LOG" | sed 's/^/  /'
+        if command -v fc-cache >/dev/null; then fc-cache -f "$HOME/.local/share/fonts" >/dev/null 2>&1 || true; fi
+    fi
+    # awww is the new name of swww. Where only swww is packaged (Ubuntu, Debian), install that and point awww at it.
+    if ! command -v awww >/dev/null; then
+        ((ATOMIC)) || command -v swww >/dev/null || pkg_install swww >/dev/null 2>&1 || true
+        # (immutable Fedora: swww was layered above and appears after the reboot, so the shim is written now either way)
+        if command -v swww >/dev/null || { ((ATOMIC)) && ! printf '%s\n' "${MISSING[@]:-}" | grep -qx swww; }; then
+            say "awww isn't packaged here: using swww (same program, older name) for wallpapers"
+            printf '#!/bin/sh\nexec swww "$@"\n' | sudo tee /usr/local/bin/awww >/dev/null
+            printf '#!/bin/sh\nexec swww-daemon "$@"\n' | sudo tee /usr/local/bin/awww-daemon >/dev/null
+            sudo chmod 755 /usr/local/bin/awww /usr/local/bin/awww-daemon
+            keep=(); for p in "${MISSING[@]}"; do [[ $p == awww || $p == swww ]] || keep+=("$p"); done; MISSING=("${keep[@]}")
+        fi
+    fi
+    # No awww or swww package at all (Ubuntu): build awww from its source (codeberg.org/LGFae/awww, ~3 minutes). Needs Rust 1.89+.
+    if ! command -v awww >/dev/null && [[ $DISTRO == debian ]]; then
+        sudo apt-get install -y -q cargo rustc pkg-config liblz4-dev libwayland-dev wayland-protocols git >/dev/null 2>&1 || true
+        rv=$(rustc --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' | head -1)
+        if [[ -n $rv ]] && printf '1.89\n%s\n' "$rv" | sort -VC; then
+            say "Building awww (wallpapers) from source, as your distro doesn't package it. This takes a few minutes"
+            atmp=$(mktemp -d)
+            if git clone -q --depth 1 --branch v0.12.1 https://codeberg.org/LGFae/awww.git "$atmp/awww" &&
+               (cd "$atmp/awww" && cargo build --release -q 2>/dev/null) &&
+               sudo install -m 755 "$atmp/awww/target/release/awww" "$atmp/awww/target/release/awww-daemon" /usr/local/bin/; then
+                keep=(); for p in "${MISSING[@]}"; do [[ $p == awww ]] || keep+=("$p"); done; MISSING=("${keep[@]}")
+            fi
+            rm -rf "$atmp"
+        else
+            echo "  awww (wallpapers) needs Rust 1.89+ to build and your distro has ${rv:-no Rust}; wallpapers stay unset until you install awww."
+        fi
     fi
 fi
 
@@ -641,6 +697,7 @@ verify_hyprland() {
         offer_wayblue
     elif ((XWL_PENDING)); then echo "  Reason: it waits for the Xwayland swap. Reboot, then run ./install.sh again."
     else echo "  Run ./diagnose.sh and send me what it prints."; fi
+    return 1
 }
 
 # ---- report ------------------------------------------------------------------------------
@@ -662,7 +719,12 @@ if command -v Hyprland >/dev/null && ! printf '0.56\n%s\n' "$(Hyprland --version
     echo "  WARNING: this config is written for Hyprland 0.56+ (the Lua config format). Your Hyprland looks older and may not load it."
 fi
 
-verify_hyprland
+HYPR_OK=1; verify_hyprland || HYPR_OK=0
+if ((! HYPR_OK)) && ! ((XWL_PENDING)); then
+    printf '\n\033[1;31mNot finished:\033[0m Hyprland itself is not installed (the reason is just above). Your configs, wallpapers and\n'
+    echo "the other packages are in place, so once Hyprland is installed, run ./install.sh again and it finishes in a minute."
+    exit 1
+fi
 if ((XWL_PENDING)) && [[ $XWL_MODE == combined ]]; then
 cat <<MSG
 
