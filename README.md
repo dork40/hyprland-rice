@@ -58,8 +58,9 @@ windows, launcher, notifications, terminal colours and wallpaper.
 | **AI keys** `Super+Shift+Ctrl+A` | One key to open your AI assistant: Claude Code, Codex, Gemini, Ollama, a web chat, and more |
 | **The basics, done** | Waybar, launcher, notifications, kitty, power menu, volume and brightness pop-ups, clipboard history, emoji picker, screenshots, screen recording, copy text from the screen |
 
-Want moving wallpapers? [Mural](https://github.com/dork40/mural) works with every look here and
-takes its colours from the current one.
+Want moving wallpapers? [Mural](https://github.com/dork40/mural) works with every look here: animated ones that take
+their colours from the current look, and free 4K videos of Earth at night from the Space Station that
+suit the dark styles. It can put them on the login screen too.
 
 ## Keys
 
