@@ -26,7 +26,7 @@ git clone https://github.com/dork40/hyprland-rice.git ~/hyprland-rice 2>/dev/nul
 ```
 
 Same lines to update. It installs Hyprland and everything the desktop uses for your distro, backs
-up your old configs to `~/.config-rice-backup-<date>`, sets up the login screen, and asks two
+up your old configs to `~/.config-rice-original` (`./install.sh --restore` puts them back), sets up the login screen, and asks two
 things: laptop or PC, and which graphics card. Reboot, pick **Hyprland** at the login screen, done.
 
 ## Looks
