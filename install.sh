@@ -2,6 +2,7 @@
 # Installs this Hyprland rice: every dependency, the configs, scripts, wallpapers and the Wardrobe style switcher.
 # Works on Arch (and Arch-based), Fedora and Ubuntu/Debian. You get the whole rice.
 #   ./install.sh    asks which edition (laptop / PC) and which graphics card (NVIDIA / AMD / Intel), then installs everything
+#   ./install.sh --restore    puts back the configs you had before the rice (they are saved, never deleted)
 # For scripted installs: RICE_EDITION=laptop|pc  RICE_GPU=nvidia|amd|intel|hybrid-amd|hybrid-intel|other  RICE_MAXPERF=0|1
 set -euo pipefail
 
@@ -9,9 +10,13 @@ set -euo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 CFG=${XDG_CONFIG_HOME:-$HOME/.config}
 BACKUP=$HOME/.config-rice-backup-$(date +%Y%m%d-%H%M%S)
+ORIGINAL=$HOME/.config-rice-original   # your configs from BEFORE the first install; later runs never touch it
 for a in "$@"; do
     case $a in
-        -h|--help) sed -n '2,5p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,6p' "$0"; exit 0 ;;
+        --restore)
+            [[ -x $ORIGINAL/restore.sh ]] || { echo "No saved configs found in $ORIGINAL (nothing was replaced)."; exit 1; }
+            exec "$ORIGINAL/restore.sh" ;;
         *) echo "unknown option: $a (just run ./install.sh)"; exit 1 ;;
     esac
 done
@@ -581,11 +586,30 @@ elif ((HAS_NVIDIA)) && [[ $DISTRO != unknown ]]; then
 fi
 
 # ---- configs ----------------------------------------------------------------------------
-say "Backing up anything that would be overwritten -> $BACKUP"
+say "Saving your current configs before anything is replaced -> $BACKUP"
+first=0; [[ -e $ORIGINAL ]] || first=1
+mkdir -p "$BACKUP"
+: >"$BACKUP/.added"
 for d in "$HERE"/config/*; do
     name=$(basename "$d")
-    if [[ -e $CFG/$name ]]; then mkdir -p "$BACKUP"; cp -a "$CFG/$name" "$BACKUP/"; fi
+    if [[ -e $CFG/$name || -L $CFG/$name ]]; then cp -a "$CFG/$name" "$BACKUP/"
+    else echo "$name" >>"$BACKUP/.added"; fi       # didn't exist before: restore removes it
 done
+cat >"$BACKUP/restore.sh" <<RESTORE
+#!/usr/bin/env bash
+# Puts back the configs saved here (the rice's copies are moved to ~/.config-rice-removed-<date>, not deleted).
+set -eu
+SAVED=\$(cd "\$(dirname "\$0")" && pwd)
+CFG=\${XDG_CONFIG_HOME:-\$HOME/.config}
+OUT=\$HOME/.config-rice-removed-\$(date +%Y%m%d-%H%M%S); mkdir -p "\$OUT"
+for n in $(cd "$HERE/config" && ls | tr '\n' ' '); do
+    [[ -e \$CFG/\$n || -L \$CFG/\$n ]] && mv "\$CFG/\$n" "\$OUT/"
+    [[ -e \$SAVED/\$n || -L \$SAVED/\$n ]] && cp -a "\$SAVED/\$n" "\$CFG/"
+done
+echo "Your old configs are back. The rice's ones are in \$OUT. Log out and back in."
+RESTORE
+chmod +x "$BACKUP/restore.sh"
+if ((first)); then ln -sfn "$BACKUP" "$ORIGINAL"; fi
 
 say "Copying configs to $CFG"
 mkdir -p "$CFG"
@@ -753,7 +777,7 @@ and choose Hyprland. No session menu? Press Ctrl+Alt+F3, log in, and type: Hyprl
   Super+Shift+R   switch rice style (Wardrobe)       Super+W   wallpapers
   Super+Shift+D   displays                           Super+F1  welcome / how to use it
   Super+/         cheat sheet of every shortcut
-Your old configs, if any, are in: $BACKUP
+Your old configs are saved in: $ORIGINAL  (put them back any time: ./install.sh --restore)
 Weather: set WEATHER_LOCATION="City,State" in your environment to pin it (default: guessed from your IP).
 MSG
 if [[ $EDITION == pc ]] && ((MAXPERF)); then
